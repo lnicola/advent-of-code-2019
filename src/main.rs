@@ -381,6 +381,8 @@ fn day9() -> Result<(), Box<dyn Error>> {
             }
         }
     }
+
+    run(program.clone(), 1);
     run(program.clone(), 2);
 
     Ok(())
