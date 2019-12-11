@@ -470,6 +470,67 @@ fn day10() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn day11() -> Result<(), Box<dyn Error>> {
+    let program = fs::read_to_string("day11.txt")?
+        .trim_end()
+        .split(',')
+        .map(|v| v.parse::<i128>())
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let vm = IntCode::from(program);
+    let mut wall = HashMap::new();
+    fn run(mut vm: IntCode, wall: &mut HashMap<(i128, i128), bool>) {
+        let (mut x, mut y, mut dir) = (0, 0, 0);
+        const D: [(i128, i128); 4] = [(0, -1), (-1, 0), (0, 1), (1, 0)];
+        loop {
+            match vm.run() {
+                State::Input(cookie) => cookie.set(*wall.get(&(x, y)).unwrap_or(&false) as i128),
+                State::Output(val) => {
+                    let val = match val {
+                        0 => false,
+                        1 => true,
+                        _ => unreachable!(),
+                    };
+                    wall.insert((x, y), val);
+                    match vm.run() {
+                        State::Output(0) => dir = (dir + 3) % 4,
+                        State::Output(1) => dir = (dir + 1) % 4,
+                        _ => unreachable!(),
+                    }
+                    x += D[dir].0;
+                    y += D[dir].1;
+                }
+                State::Halted => break,
+            }
+        }
+    }
+    run(vm.clone(), &mut wall);
+    println!("{}", wall.len());
+    wall.clear();
+    wall.insert((0, 0), true);
+    run(vm, &mut wall);
+    let mut minx = i128::max_value();
+    let mut maxx = i128::min_value();
+    let mut miny = i128::max_value();
+    let mut maxy = i128::min_value();
+    for &(x, y) in wall.keys() {
+        minx = minx.min(x);
+        maxx = maxx.max(x);
+        miny = miny.min(y);
+        maxy = maxy.max(y);
+    }
+    for y in miny..=maxy {
+        for x in minx..=maxx {
+            match *wall.get(&(maxx + minx - x, y)).unwrap_or(&false) {
+                false => print!(" "),
+                true => print!("█"),
+            }
+        }
+        println!();
+    }
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    day10()
+    day11()
 }
