@@ -3,12 +3,12 @@ use std::iter::FromIterator;
 
 #[derive(Clone)]
 pub struct IntCode {
-    mem: HashMap<usize, i128>,
-    ip: usize,
+    mem: HashMap<i128, i128>,
+    ip: i128,
     rb: i128,
 }
 
-pub struct InputCookie<'a>(usize, &'a mut IntCode);
+pub struct InputCookie<'a>(i128, &'a mut IntCode);
 
 impl InputCookie<'_> {
     pub fn set(self, val: i128) {
@@ -33,7 +33,7 @@ impl IntCode {
 
     pub fn from(mem: Vec<i128>) -> Self {
         Self {
-            mem: HashMap::from_iter(mem.into_iter().enumerate()),
+            mem: HashMap::from_iter(mem.into_iter().enumerate().map(|(a, v)| (a as i128, v))),
             ip: 0,
             rb: 0,
         }
@@ -41,7 +41,7 @@ impl IntCode {
 
     pub fn run(&mut self) -> State {
         loop {
-            let instr = self.mem[&self.ip];
+            let instr = self.read_mem(self.ip);
             match instr % 100 {
                 1 => {
                     let p1 = self.get_param(0);
@@ -71,7 +71,7 @@ impl IntCode {
                     let p1 = self.get_param(0);
                     let p2 = self.get_param(1);
                     if p1 != 0 {
-                        self.ip = p2 as usize;
+                        self.ip = p2;
                     } else {
                         self.ip += 3;
                     }
@@ -80,7 +80,7 @@ impl IntCode {
                     let p1 = self.get_param(0);
                     let p2 = self.get_param(1);
                     if p1 == 0 {
-                        self.ip = p2 as usize;
+                        self.ip = p2;
                     } else {
                         self.ip += 3;
                     }
@@ -117,37 +117,41 @@ impl IntCode {
         }
     }
 
-    pub fn read_mem(&self, addr: usize) -> i128 {
-        self.mem[&addr]
+    pub fn read_mem(&self, addr: i128) -> i128 {
+        *self.mem.get(&addr).unwrap_or(&0)
+    }
+
+    pub fn write_mem(&mut self, addr: i128, val: i128) {
+        self.mem.insert(addr, val);
     }
 
     fn get_param(&self, pos: u8) -> i128 {
         let (addr, mode) = match pos {
-            0 => (self.ip + 1, self.mem[&self.ip] / 100 % 10),
-            1 => (self.ip + 2, self.mem[&self.ip] / 1_000 % 10),
-            2 => (self.ip + 3, self.mem[&self.ip] / 10_000 % 10),
+            0 => (self.ip + 1, self.read_mem(self.ip) / 100 % 10),
+            1 => (self.ip + 2, self.read_mem(self.ip) / 1_000 % 10),
+            2 => (self.ip + 3, self.read_mem(self.ip) / 10_000 % 10),
             _ => unreachable!(),
         };
-        let val = self.mem[&addr];
+        let val = self.read_mem(addr);
         match mode {
-            0 => self.mem[&(val as usize)],
+            0 => self.read_mem(val),
             1 => val as i128,
-            2 => self.mem[&((self.rb + val) as usize)],
+            2 => self.read_mem(self.rb + val),
             _ => unreachable!(),
         }
     }
 
-    fn get_param_target(&self, pos: u8) -> usize {
+    fn get_param_target(&self, pos: u8) -> i128 {
         let (addr, mode) = match pos {
-            0 => (self.ip + 1, self.mem[&self.ip] / 100 % 10),
-            1 => (self.ip + 2, self.mem[&self.ip] / 1_000 % 10),
-            2 => (self.ip + 3, self.mem[&self.ip] / 10_000 % 10),
+            0 => (self.ip + 1, self.read_mem(self.ip) / 100 % 10),
+            1 => (self.ip + 2, self.read_mem(self.ip) / 1_000 % 10),
+            2 => (self.ip + 3, self.read_mem(self.ip) / 10_000 % 10),
             _ => unreachable!(),
         };
-        let val = self.mem[&addr];
+        let val = self.read_mem(addr);
         match mode {
-            0 => val as usize,
-            2 => (self.rb + val) as usize,
+            0 => val,
+            2 => self.rb + val,
             _ => unreachable!(),
         }
     }
