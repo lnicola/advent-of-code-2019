@@ -8,6 +8,8 @@ use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 
 mod int_code;
+mod iterator;
+mod num;
 
 fn day1() -> Result<(), Box<dyn Error>> {
     let file = File::open("day1.txt")?;
@@ -533,6 +535,97 @@ fn day11() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn day12() -> Result<(), Box<dyn Error>> {
+    let file = File::open("day12.txt")?;
+    let reader = BufReader::new(file);
+    let mut px = Vec::new();
+    let mut py = Vec::new();
+    let mut pz = Vec::new();
+    for line in reader.lines() {
+        let line = line?;
+        let mut parts = line.split(|c| c == '=' || c == ',' || c == '>');
+        parts.next();
+        let x = parts.next().unwrap().parse::<i32>()?;
+        parts.next();
+        let y = parts.next().unwrap().parse::<i32>()?;
+        parts.next();
+        let z = parts.next().unwrap().parse::<i32>()?;
+        px.push(x);
+        py.push(y);
+        pz.push(z);
+    }
+    let n = px.len();
+    let mut vx = vec![0; n];
+    let mut vy = vec![0; n];
+    let mut vz = vec![0; n];
+    let mut states_x = HashSet::new();
+    let mut states_y = HashSet::new();
+    let mut states_z = HashSet::new();
+    let mut per_x = None;
+    let mut per_y = None;
+    let mut per_z = None;
+    let mut time = 0u64;
+
+    fn insert_state(states: &mut HashSet<Vec<i32>>, p: &[i32], v: &[i32]) -> bool {
+        states.insert(ichain!(p.iter().copied(), v.iter().copied()).collect::<Vec<_>>())
+    }
+
+    loop {
+        if let (Some(per_x), Some(per_y), Some(per_z)) = (per_x, per_y, per_z) {
+            let period = num::lcm3(per_x, per_y, per_z);
+            println!("{}", period);
+            break;
+        }
+        if per_x.is_none() && !insert_state(&mut states_x, px.as_slice(), vx.as_slice()) {
+            per_x = Some(time);
+        }
+        if per_y.is_none() && !insert_state(&mut states_y, py.as_slice(), vy.as_slice()) {
+            per_y = Some(time);
+        }
+        if per_z.is_none() && !insert_state(&mut states_z, pz.as_slice(), vz.as_slice()) {
+            per_z = Some(time);
+        }
+        time += 1;
+
+        fn update_velocities(p: &[i32], v: &mut [i32]) {
+            assert_eq!(p.len(), v.len());
+            for i in 0..p.len() {
+                for j in i + 1..p.len() {
+                    if p[i] < p[j] {
+                        v[i] += 1;
+                        v[j] -= 1;
+                    } else if p[i] > p[j] {
+                        v[i] -= 1;
+                        v[j] += 1;
+                    }
+                }
+            }
+        }
+
+        update_velocities(px.as_slice(), vx.as_mut_slice());
+        update_velocities(py.as_slice(), vy.as_mut_slice());
+        update_velocities(pz.as_slice(), vz.as_mut_slice());
+
+        for (p, v) in ichain!(
+            izip!(&mut px, &vx),
+            izip!(&mut py, &vy),
+            izip!(&mut pz, &vz)
+        ) {
+            *p += *v;
+        }
+        if time == 1000 {
+            let mut e = 0;
+            for (px, py, pz, vx, vy, vz) in izip!(&px, &py, &pz, &vx, &vy, &vz) {
+                let pot = px.abs() + py.abs() + pz.abs();
+                let kin = vx.abs() + vy.abs() + vz.abs();
+                e += pot * kin;
+            }
+            print!("{} ", e);
+        }
+    }
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    day11()
+    day12()
 }
