@@ -566,8 +566,12 @@ fn day12() -> Result<(), Box<dyn Error>> {
     let mut per_z = None;
     let mut time = 0u64;
 
-    fn insert_state(states: &mut HashSet<Vec<i32>>, p: &[i32], v: &[i32]) -> bool {
-        states.insert(ichain!(p.iter().copied(), v.iter().copied()).collect::<Vec<_>>())
+    fn insert_state(states: &mut HashSet<Box<[i32]>>, p: &[i32], v: &[i32]) -> bool {
+        states.insert(
+            ichain!(p.iter().copied(), v.iter().copied())
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+        )
     }
 
     loop {
