@@ -554,16 +554,11 @@ fn day12() -> Result<(), Box<dyn Error>> {
         py.push(y);
         pz.push(z);
     }
-    let n = px.len();
-    let mut vx = vec![0; n];
-    let mut vy = vec![0; n];
-    let mut vz = vec![0; n];
-    let mut states_x = HashSet::new();
-    let mut states_y = HashSet::new();
-    let mut states_z = HashSet::new();
-    let mut per_x = None;
-    let mut per_y = None;
-    let mut per_z = None;
+    let mut vx = vec![0; px.len()];
+    let mut vy = vec![0; py.len()];
+    let mut vz = vec![0; pz.len()];
+    let (mut states_x, mut states_y, mut states_z) = Default::default();
+    let (mut per_x, mut per_y, mut per_z) = Default::default();
     let mut time = 0u64;
 
     fn insert_state(states: &mut HashSet<Box<[i32]>>, p: &[i32], v: &[i32]) -> bool {
@@ -638,9 +633,7 @@ fn day13() -> Result<(), Box<dyn Error>> {
         .collect::<Result<Vec<_>, _>>()?;
 
     let mut vm = IntCode::from(program);
-    // let mut screen = HashMap::new();
 
-    #[derive(Debug, Clone)]
     enum Tile {
         Empty,
         Wall,
@@ -649,16 +642,14 @@ fn day13() -> Result<(), Box<dyn Error>> {
         Ball,
     }
 
-    #[derive(Clone)]
     struct Pong {
         vm: IntCode,
-        screen: HashMap<(i128, i128), Tile>,
-        curr_ball_x: Option<i128>,
-        curr_ball_y: Option<i128>,
+        ball_x: Option<i128>,
+        ball_y: Option<i128>,
         paddle_x: Option<i128>,
         paddle_y: Option<i128>,
-        score: Option<i128>,
-        blocks: i128,
+        score: i128,
+        blocks: Option<i128>,
     }
 
     vm.write_mem(0, 2);
@@ -672,17 +663,16 @@ fn day13() -> Result<(), Box<dyn Error>> {
         fn new(vm: IntCode) -> Self {
             Self {
                 vm,
-                screen: HashMap::new(),
-                curr_ball_x: None,
-                curr_ball_y: None,
+                ball_x: None,
+                ball_y: None,
                 paddle_x: None,
                 paddle_y: None,
-                score: None,
-                blocks: 0,
+                score: 0,
+                blocks: None,
             }
         }
 
-        fn run<F: Fn(i128) -> i8>(&mut self, sim: bool, get_input: F) -> Outcome {
+        fn run<F: FnMut(i128, i128) -> i8>(&mut self, sim: bool, mut get_input: F) -> Outcome {
             loop {
                 let x = match self.vm.run() {
                     State::Output(val) => val,
@@ -690,11 +680,15 @@ fn day13() -> Result<(), Box<dyn Error>> {
                         return Outcome::Halted;
                     }
                     State::Input(cookie) => {
-                        cookie.set(get_input(self.paddle_x.unwrap()) as i128);
+                        if self.blocks != 0 {
+                            print!("{} ", self.blocks);
+                            self.blocks = 0;
+                        }
+                        cookie.set(get_input(self.paddle_x.unwrap(), self.ball_x.unwrap()) as i128);
                         if self.paddle_y.is_some() {
-                            if self.curr_ball_y.unwrap() == self.paddle_y.unwrap() - 1 {
+                            if self.ball_y.unwrap() == self.paddle_y.unwrap() - 1 {
                                 return Outcome::Target {
-                                    ball_x: self.curr_ball_x,
+                                    ball_x: self.ball_x,
                                 };
                             }
                         }
@@ -711,7 +705,7 @@ fn day13() -> Result<(), Box<dyn Error>> {
                     State::Output(val) => {
                         if x == -1 && y == 0 {
                             if !sim {
-                                println!("Score: {}", val);
+                                self.score = val;
                             }
                             continue;
                         } else {
@@ -729,47 +723,33 @@ fn day13() -> Result<(), Box<dyn Error>> {
                         unreachable!();
                     }
                 };
-                if let Tile::Ball = tile {
-                    self.curr_ball_x = Some(x);
-                    self.curr_ball_y = Some(y);
-                } else if let Tile::Paddle = tile {
-                    self.paddle_x = Some(x);
-                    self.paddle_y = Some(y);
+                match tile {
+                    Tile::Ball => {
+                        self.ball_x = Some(x);
+                        self.ball_y = Some(y);
+                    }
+                    Tile::Paddle => {
+                        self.paddle_x = Some(x);
+                        self.paddle_y = Some(y);
+                    }
+                    Tile::Block => self.blocks = Some(self.blocks.or_default() + 1),
+                    _ => {}
                 }
-                self.screen.insert((x, y), tile);
             }
+        }
+
+        pub fn score(&self) -> i128 {
+            self.score
         }
     }
 
     let mut pong = Pong::new(vm);
     loop {
-        let mut sim = pong.clone();
-        let next_x = loop {
-            match sim.run(true, |_| 0) {
-                Outcome::Target { ball_x } => break ball_x.unwrap(),
-                Outcome::Halted => break 0,
-            }
-        };
-        if let Outcome::Halted = pong.run(false, |paddle_x| {
-            if paddle_x < next_x {
-                1
-            } else if paddle_x > next_x {
-                -1
-            } else {
-                0
-            }
-        }) {
+        if let Outcome::Halted = pong.run(false, |paddle_x, ball_x| ball_x.cmp(&paddle_x) as i8) {
             break;
         }
     }
-    // let mut blocks = 0;
-    // for tile in screen.values() {
-    //     if let Tile::Block = *tile {
-    //         blocks += 1;
-    // print!()
-    //     }
-    // }
-    // println!("{}", blocks);
+    println!("{}", pong.score());
     Ok(())
 }
 
