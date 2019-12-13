@@ -630,6 +630,149 @@ fn day12() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn day13() -> Result<(), Box<dyn Error>> {
+    let program = fs::read_to_string("day13.txt")?
+        .trim_end()
+        .split(',')
+        .map(|v| v.parse::<i128>())
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let mut vm = IntCode::from(program);
+    // let mut screen = HashMap::new();
+
+    #[derive(Debug, Clone)]
+    enum Tile {
+        Empty,
+        Wall,
+        Block,
+        Paddle,
+        Ball,
+    }
+
+    #[derive(Clone)]
+    struct Pong {
+        vm: IntCode,
+        screen: HashMap<(i128, i128), Tile>,
+        curr_ball_x: Option<i128>,
+        curr_ball_y: Option<i128>,
+        paddle_x: Option<i128>,
+        paddle_y: Option<i128>,
+        score: Option<i128>,
+        blocks: i128,
+    }
+
+    vm.write_mem(0, 2);
+
+    enum Outcome {
+        Target { ball_x: Option<i128> },
+        Halted,
+    }
+
+    impl Pong {
+        fn new(vm: IntCode) -> Self {
+            Self {
+                vm,
+                screen: HashMap::new(),
+                curr_ball_x: None,
+                curr_ball_y: None,
+                paddle_x: None,
+                paddle_y: None,
+                score: None,
+                blocks: 0,
+            }
+        }
+
+        fn run<F: Fn(i128) -> i8>(&mut self, sim: bool, get_input: F) -> Outcome {
+            loop {
+                let x = match self.vm.run() {
+                    State::Output(val) => val,
+                    State::Halted => {
+                        return Outcome::Halted;
+                    }
+                    State::Input(cookie) => {
+                        cookie.set(get_input(self.paddle_x.unwrap()) as i128);
+                        if self.paddle_y.is_some() {
+                            if self.curr_ball_y.unwrap() == self.paddle_y.unwrap() - 1 {
+                                return Outcome::Target {
+                                    ball_x: self.curr_ball_x,
+                                };
+                            }
+                        }
+                        continue;
+                    }
+                };
+                let y = match self.vm.run() {
+                    State::Output(val) => val,
+                    _ => {
+                        unreachable!();
+                    }
+                };
+                let tile = match self.vm.run() {
+                    State::Output(val) => {
+                        if x == -1 && y == 0 {
+                            if !sim {
+                                println!("Score: {}", val);
+                            }
+                            continue;
+                        } else {
+                            match val {
+                                0 => Tile::Empty,
+                                1 => Tile::Wall,
+                                2 => Tile::Block,
+                                3 => Tile::Paddle,
+                                4 => Tile::Ball,
+                                _ => unreachable!(),
+                            }
+                        }
+                    }
+                    _ => {
+                        unreachable!();
+                    }
+                };
+                if let Tile::Ball = tile {
+                    self.curr_ball_x = Some(x);
+                    self.curr_ball_y = Some(y);
+                } else if let Tile::Paddle = tile {
+                    self.paddle_x = Some(x);
+                    self.paddle_y = Some(y);
+                }
+                self.screen.insert((x, y), tile);
+            }
+        }
+    }
+
+    let mut pong = Pong::new(vm);
+    loop {
+        let mut sim = pong.clone();
+        let next_x = loop {
+            match sim.run(true, |_| 0) {
+                Outcome::Target { ball_x } => break ball_x.unwrap(),
+                Outcome::Halted => break 0,
+            }
+        };
+        if let Outcome::Halted = pong.run(false, |paddle_x| {
+            if paddle_x < next_x {
+                1
+            } else if paddle_x > next_x {
+                -1
+            } else {
+                0
+            }
+        }) {
+            break;
+        }
+    }
+    // let mut blocks = 0;
+    // for tile in screen.values() {
+    //     if let Tile::Block = *tile {
+    //         blocks += 1;
+    // print!()
+    //     }
+    // }
+    // println!("{}", blocks);
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    day12()
+    day13()
 }
