@@ -633,123 +633,47 @@ fn day13() -> Result<(), Box<dyn Error>> {
         .collect::<Result<Vec<_>, _>>()?;
 
     let mut vm = IntCode::from(program);
-
-    enum Tile {
-        Empty,
-        Wall,
-        Block,
-        Paddle,
-        Ball,
-    }
-
-    struct Pong {
-        vm: IntCode,
-        ball_x: Option<i128>,
-        ball_y: Option<i128>,
-        paddle_x: Option<i128>,
-        paddle_y: Option<i128>,
-        score: i128,
-        blocks: Option<i128>,
-    }
+    let mut ball_x = None::<i128>;
+    let mut paddle_x = None;
+    let mut score = 0;
+    let mut blocks = None;
 
     vm.write_mem(0, 2);
-
-    enum Outcome {
-        Target { ball_x: Option<i128> },
-        Halted,
-    }
-
-    impl Pong {
-        fn new(vm: IntCode) -> Self {
-            Self {
-                vm,
-                ball_x: None,
-                ball_y: None,
-                paddle_x: None,
-                paddle_y: None,
-                score: 0,
-                blocks: None,
-            }
-        }
-
-        fn run<F: FnMut(i128, i128) -> i8>(&mut self, sim: bool, mut get_input: F) -> Outcome {
-            loop {
-                let x = match self.vm.run() {
-                    State::Output(val) => val,
-                    State::Halted => {
-                        return Outcome::Halted;
-                    }
-                    State::Input(cookie) => {
-                        if self.blocks != 0 {
-                            print!("{} ", self.blocks);
-                            self.blocks = 0;
-                        }
-                        cookie.set(get_input(self.paddle_x.unwrap(), self.ball_x.unwrap()) as i128);
-                        if self.paddle_y.is_some() {
-                            if self.ball_y.unwrap() == self.paddle_y.unwrap() - 1 {
-                                return Outcome::Target {
-                                    ball_x: self.ball_x,
-                                };
-                            }
-                        }
-                        continue;
-                    }
-                };
-                let y = match self.vm.run() {
-                    State::Output(val) => val,
-                    _ => {
-                        unreachable!();
-                    }
-                };
-                let tile = match self.vm.run() {
-                    State::Output(val) => {
-                        if x == -1 && y == 0 {
-                            if !sim {
-                                self.score = val;
-                            }
-                            continue;
-                        } else {
-                            match val {
-                                0 => Tile::Empty,
-                                1 => Tile::Wall,
-                                2 => Tile::Block,
-                                3 => Tile::Paddle,
-                                4 => Tile::Ball,
-                                _ => unreachable!(),
-                            }
-                        }
-                    }
-                    _ => {
-                        unreachable!();
-                    }
-                };
-                match tile {
-                    Tile::Ball => {
-                        self.ball_x = Some(x);
-                        self.ball_y = Some(y);
-                    }
-                    Tile::Paddle => {
-                        self.paddle_x = Some(x);
-                        self.paddle_y = Some(y);
-                    }
-                    Tile::Block => self.blocks = Some(self.blocks.or_default() + 1),
-                    _ => {}
-                }
-            }
-        }
-
-        pub fn score(&self) -> i128 {
-            self.score
-        }
-    }
-
-    let mut pong = Pong::new(vm);
     loop {
-        if let Outcome::Halted = pong.run(false, |paddle_x, ball_x| ball_x.cmp(&paddle_x) as i8) {
-            break;
-        }
+        let x = match vm.run() {
+            State::Output(val) => val,
+            State::Halted => {
+                break;
+            }
+            State::Input(cookie) => {
+                if let Some(blocks) = blocks.take() {
+                    print!("{} ", blocks);
+                }
+                match (ball_x, paddle_x) {
+                    (Some(ball_x), Some(paddle_x)) => cookie.set(ball_x.cmp(&paddle_x) as i128),
+                    _ => unreachable!(),
+                }
+                continue;
+            }
+        };
+        let y = match vm.run() {
+            State::Output(val) => val,
+            _ => {
+                unreachable!();
+            }
+        };
+        match vm.run() {
+            State::Output(val) if x == -1 && y == 0 => score = val,
+            State::Output(0) | State::Output(1) => {}
+            State::Output(2) => *blocks.get_or_insert(0) += 1,
+            State::Output(3) => paddle_x = Some(x),
+            State::Output(4) => ball_x = Some(x),
+            _ => {
+                unreachable!();
+            }
+        };
     }
-    println!("{}", pong.score());
+    println!("{}", score);
     Ok(())
 }
 
