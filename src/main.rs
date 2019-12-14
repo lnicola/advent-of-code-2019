@@ -1,13 +1,18 @@
 #![allow(dead_code)]
 
 use int_code::{IntCode, State};
+use interner::Interner;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt::Write;
 use std::fs::{self, File};
-use std::io::{BufRead, BufReader};
+use std::{
+    cmp::Ordering,
+    io::{BufRead, BufReader},
+};
 
 mod int_code;
+mod interner;
 mod iterator;
 mod num;
 
@@ -49,7 +54,7 @@ fn day2() -> Result<(), Box<dyn Error>> {
 
     for noun in 0..100 {
         for verb in 0..100 {
-            if run(program.clone(), noun, verb) == 19690720 {
+            if run(program.clone(), noun, verb) == 19_690_720 {
                 println!("{}", 100 * noun + verb);
             }
         }
@@ -155,7 +160,7 @@ fn day5() -> Result<(), Box<dyn Error>> {
         output
     }
     println!("{}", run(program.clone(), 1));
-    println!("{}", run(program.clone(), 5));
+    println!("{}", run(program, 5));
 
     Ok(())
 }
@@ -163,25 +168,18 @@ fn day5() -> Result<(), Box<dyn Error>> {
 fn day6() -> Result<(), Box<dyn Error>> {
     let file = File::open("day6.txt")?;
     let reader = BufReader::new(file);
-    let mut id_map = HashMap::new();
+    let mut objects = Interner::new();
     let mut map = HashMap::new();
-    let mut n = 0;
     for line in reader.lines() {
         let line = line?;
         let pos = line.find(')').expect("invalid input");
         let p = line[..pos].to_string();
         let q = line[pos + 1..].trim_end().to_string();
-        let p = *id_map.entry(p).or_insert_with(|| {
-            n += 1;
-            n - 1
-        });
-        let q = *id_map.entry(q).or_insert_with(|| {
-            n += 1;
-            n - 1
-        });
-        map.entry(p).or_insert(vec![]).push(q);
+        let p = objects.insert(p);
+        let q = objects.insert(q);
+        map.entry(p).or_insert_with(Vec::new).push(q);
     }
-    let com = id_map["COM"];
+    let com = objects["COM"];
     let mut checksum = 0;
     let mut stack = Vec::new();
     let mut parent = HashMap::new();
@@ -195,9 +193,10 @@ fn day6() -> Result<(), Box<dyn Error>> {
             }
         }
     }
-    println!("{}", checksum);
-    let mut p = id_map["YOU"];
-    let mut q = id_map["SAN"];
+    print!("{} ", checksum);
+
+    let mut p = objects["YOU"];
+    let mut q = objects["SAN"];
     let mut seen = HashMap::new();
     let mut d1 = 0;
     let mut d2 = 0;
@@ -385,7 +384,7 @@ fn day9() -> Result<(), Box<dyn Error>> {
     }
 
     run(program.clone(), 1);
-    run(program.clone(), 2);
+    run(program, 2);
 
     Ok(())
 }
@@ -410,7 +409,7 @@ fn day10() -> Result<(), Box<dyn Error>> {
     }
 
     fn between(p1: (f64, f64), p2: (f64, f64), p3: (f64, f64)) -> bool {
-        dist(p1, p2) + dist(p2, p3) - dist(p1, p3) < 0.000000001
+        dist(p1, p2) + dist(p2, p3) - dist(p1, p3) < 0.000_000_001
     }
 
     let n = asteroids.len();
@@ -449,7 +448,7 @@ fn day10() -> Result<(), Box<dyn Error>> {
             let dy = p.1 - station_p.1;
             let angle = dx.atan2(-dy);
             let t = (angle * 1_000_000.0) as u32;
-            angle_map.entry(t).or_insert(vec![]).push(i);
+            angle_map.entry(t).or_insert_with(Vec::new).push(i);
         }
     }
     let mut angle_map = angle_map.into_iter().collect::<Vec<_>>();
@@ -525,9 +524,10 @@ fn day11() -> Result<(), Box<dyn Error>> {
     }
     for y in miny..=maxy {
         for x in minx..=maxx {
-            match *wall.get(&(maxx + minx - x, y)).unwrap_or(&false) {
-                false => print!(" "),
-                true => print!("█"),
+            if *wall.get(&(maxx + minx - x, y)).unwrap_or(&false) {
+                print!("█");
+            } else {
+                print!(" ")
             }
         }
         println!();
@@ -543,7 +543,7 @@ fn day12() -> Result<(), Box<dyn Error>> {
     let mut pz = Vec::new();
     for line in reader.lines() {
         let line = line?;
-        let mut parts = line.split(|c| c == '=' || c == ',' || c == '>');
+        let mut parts = line.split(['=', ',', '>'].as_ref());
         parts.next();
         let x = parts.next().unwrap().parse::<i32>()?;
         parts.next();
@@ -590,12 +590,16 @@ fn day12() -> Result<(), Box<dyn Error>> {
             assert_eq!(p.len(), v.len());
             for i in 0..p.len() {
                 for j in i + 1..p.len() {
-                    if p[i] < p[j] {
-                        v[i] += 1;
-                        v[j] -= 1;
-                    } else if p[i] > p[j] {
-                        v[i] -= 1;
-                        v[j] += 1;
+                    match p[i].cmp(&p[j]) {
+                        Ordering::Less => {
+                            v[i] += 1;
+                            v[j] -= 1;
+                        }
+                        Ordering::Greater => {
+                            v[i] -= 1;
+                            v[j] += 1;
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -677,6 +681,116 @@ fn day13() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn day14() -> Result<(), Box<dyn Error>> {
+    let file = File::open("day14.txt")?;
+    let reader = BufReader::new(file);
+
+    #[derive(Clone, Debug)]
+    struct MaterialQuantity {
+        material: usize,
+        quantity: i64,
+    }
+
+    #[derive(Clone, Debug)]
+    struct Reaction {
+        inputs: Vec<MaterialQuantity>,
+        output: MaterialQuantity,
+    }
+
+    let mut materials = interner::Interner::new();
+    let mut reactions = HashMap::new();
+    for line in reader.lines() {
+        let line = line?;
+        let mut parts = line.split([' ', ',', '=', '>'].as_ref()).rev();
+
+        let output = MaterialQuantity {
+            material: materials.insert(parts.next().unwrap().to_string()),
+            quantity: parts.next().unwrap().parse()?,
+        };
+        parts.next();
+        parts.next();
+        parts.next();
+
+        let mut inputs = Vec::new();
+        loop {
+            inputs.push(MaterialQuantity {
+                material: materials.insert(parts.next().unwrap().to_string()),
+                quantity: parts.next().unwrap().parse()?,
+            });
+            if parts.next().is_none() {
+                break;
+            }
+        }
+        let reaction = Reaction { inputs, output };
+        reactions.insert(reaction.output.material, reaction);
+    }
+    let ore = materials["ORE"];
+    let fuel = materials["FUEL"];
+
+    fn run(
+        reactions: &HashMap<usize, Reaction>,
+        fuel_goal: i64,
+        fuel_id: usize,
+        ore_id: usize,
+    ) -> i64 {
+        let fuel = MaterialQuantity {
+            material: fuel_id,
+            quantity: fuel_goal,
+        };
+        let mut goals = vec![fuel];
+        let mut available = HashMap::new();
+        let mut ore = 0;
+        while let Some(mut goal) = goals.pop() {
+            if goal.material == ore_id {
+                ore += goal.quantity;
+                continue;
+            }
+            let have = available.entry(goal.material).or_insert(0);
+            let m = goal.quantity.min(*have);
+            goal.quantity -= m;
+            *have -= m;
+            if goal.quantity > 0 {
+                let reaction = &reactions[&goal.material];
+                let k = (goal.quantity + reaction.output.quantity - 1) / reaction.output.quantity;
+                for r in &reaction.inputs {
+                    let mut want = r.quantity * k;
+                    let have = available.entry(r.material).or_insert(0);
+                    let m = want.min(*have);
+                    want -= m;
+                    *have -= m;
+                    goals.push(MaterialQuantity {
+                        material: r.material,
+                        quantity: want,
+                    });
+                }
+                let d = reaction.output.quantity * k - goal.quantity;
+                *available.entry(goal.material).or_insert(0) += d;
+            }
+        }
+        ore
+    }
+
+    let ore_available = 1_000_000_000_000i64;
+    let r = run(&reactions, 1, fuel, ore);
+    let mut lo = ore_available / r;
+    let mut d = 1;
+    while run(&reactions, lo + d, fuel, ore) < ore_available {
+        d *= 2;
+    }
+    let mut hi = lo + d;
+    while lo < hi {
+        let m = lo + (hi - lo) / 2;
+        let needed = run(&reactions, m, fuel, ore);
+        if needed <= ore_available {
+            lo = m;
+        } else {
+            hi = m - 1;
+        }
+    }
+    println!("{} {}", r, lo);
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    day13()
+    day14()
 }
