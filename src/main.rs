@@ -2,14 +2,12 @@
 
 use int_code::{IntCode, State};
 use interner::Interner;
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt::Write;
 use std::fs::{self, File};
-use std::{
-    cmp::Ordering,
-    io::{BufRead, BufReader},
-};
+use std::io::{BufRead, BufReader};
 
 mod int_code;
 mod interner;
@@ -697,7 +695,7 @@ fn day14() -> Result<(), Box<dyn Error>> {
         output: MaterialQuantity,
     }
 
-    let mut materials = interner::Interner::new();
+    let mut materials = Interner::new();
     let mut reactions = HashMap::new();
     for line in reader.lines() {
         let line = line?;
@@ -791,6 +789,109 @@ fn day14() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn day15() -> Result<(), Box<dyn Error>> {
+    let program = fs::read_to_string("day15.txt")?
+        .trim_end()
+        .split(',')
+        .map(|v| v.parse::<i128>())
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let mut vm = IntCode::from(program);
+    let mut map = HashMap::new();
+
+    let (mut x, mut y) = (0, 0);
+    let (mut tx, mut ty) = (0, 0);
+    map.insert((0, 0), (false, 5));
+
+    const D: [(i128, i128); 4] = [(0, -1), (0, 1), (-1, 0), (1, 0)];
+    'main: loop {
+        for k in 0..4u8 {
+            let (nx, ny) = (x + D[k as usize].0, y + D[k as usize].1);
+            if map.get(&(nx, ny)).is_some() {
+                continue;
+            }
+
+            match vm.run() {
+                State::Input(cookie) => {
+                    cookie.set((k + 1) as i128);
+                }
+                _ => unreachable!(),
+            }
+            match vm.run() {
+                State::Output(0) => {
+                    map.insert((nx, ny), (true, 5));
+                }
+                State::Output(t) => {
+                    if t == 2 {
+                        tx = nx;
+                        ty = ny;
+                    } else if t != 1 {
+                        unreachable!()
+                    }
+                    x = nx;
+                    y = ny;
+                    let prev_direction = match k {
+                        0 => 1,
+                        1 => 0,
+                        2 => 3,
+                        3 => 2,
+                        _ => unreachable!(),
+                    };
+                    map.insert((nx, ny), (false, prev_direction));
+                    continue 'main;
+                }
+                _ => unreachable!(),
+            }
+        }
+        match map.get(&(x, y)) {
+            Some((_, 5)) => break,
+            Some((_, prev_direction)) => {
+                match vm.run() {
+                    State::Input(cookie) => {
+                        cookie.set((prev_direction + 1) as i128);
+                    }
+                    _ => unreachable!(),
+                }
+                match vm.run() {
+                    State::Output(1) => {
+                        x += D[*prev_direction as usize].0;
+                        y += D[*prev_direction as usize].1;
+                        continue 'main;
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    let mut stack = vec![(tx, ty, 0)];
+    let mut visited = HashMap::new();
+    while let Some((x, y, d)) = stack.pop() {
+        if x == 0 && y == 0 {
+            print!("{} ", d);
+        }
+        visited.insert((x, y), d);
+        for k in 0..4 {
+            let (nx, ny) = (x + D[k].0, y + D[k].1);
+            if let Some((true, _)) = map.get(&(nx, ny)) {
+                continue;
+            }
+            match visited.get(&(nx, ny)) {
+                Some(prev_d) if *prev_d < d + 1 => {
+                    continue;
+                }
+                _ => {
+                    visited.insert((nx, ny), d + 1);
+                    stack.push((nx, ny, d + 1));
+                }
+            }
+        }
+    }
+    println!("{}", visited.values().max().unwrap_or(&0));
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    day14()
+    day15()
 }
