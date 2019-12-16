@@ -8,6 +8,7 @@ use std::error::Error;
 use std::fmt::Write;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
+use std::iter;
 
 mod int_code;
 mod interner;
@@ -892,6 +893,67 @@ fn day15() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn day16() -> Result<(), Box<dyn Error>> {
+    let input = fs::read_to_string("day16.txt")?;
+    let mut input = input
+        .trim()
+        .chars()
+        .map(|c| (c as u8 - b'0') as i32)
+        .collect::<Vec<_>>();
+
+    let mut next = vec![0; input.len()];
+
+    let mut offset = 0;
+    for i in 0..7 {
+        offset = offset * 10 + input[i];
+    }
+
+    let mut suffix = input
+        .iter()
+        .copied()
+        .rev()
+        .cycle()
+        .take(input.len() * 10_000 - offset as usize)
+        .collect::<Vec<_>>();
+
+    for _ in 0..100 {
+        for i in 0..input.len() {
+            let pattern = iter::repeat(0)
+                .take(i + 1)
+                .chain(iter::repeat(1).take(i + 1))
+                .chain(iter::repeat(0).take(i + 1))
+                .chain(iter::repeat(-1).take(i + 1))
+                .cycle()
+                .skip(1);
+            next[i] = input
+                .iter()
+                .zip(pattern)
+                .map(|(i, p)| i * p)
+                .sum::<i32>()
+                .abs()
+                % 10;
+        }
+        input.copy_from_slice(&next);
+    }
+    for i in 0..8 {
+        print!("{}", input[i]);
+    }
+    print!(" ");
+
+    for _ in 0..100 {
+        let mut sum = 0;
+        for d in &mut suffix {
+            sum += *d;
+            *d = sum.abs() % 10;
+        }
+    }
+    for d in suffix.iter().rev().take(8) {
+        print!("{}", d);
+    }
+    println!();
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    day15()
+    day16()
 }
