@@ -954,6 +954,76 @@ fn day16() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn day17() -> Result<(), Box<dyn Error>> {
+    let program = fs::read_to_string("day17.txt")?
+        .trim_end()
+        .split(',')
+        .map(|v| v.parse::<i128>())
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let mut vm = IntCode::from(program);
+    let mut map = Vec::new();
+    let mut width = 0;
+    let mut height = 0;
+    let mut cnt = 0;
+    let mut alignment = 0;
+    vm.write_mem(0, 2);
+    let program = r"A,B,A,C,A,B,C,B,C,A
+L,12,R,4,R,4,L,6
+L,12,R,4,R,4,R,12
+L,10,L,6,R,4
+n
+";
+    let mut program_it = program.chars();
+    loop {
+        match vm.run() {
+            State::Output(val) => {
+                let c = val as u8 as char;
+                if height == 0 {
+                    if width == 0 && c == '\n' {
+                        width = cnt;
+                    } else {
+                        cnt += 1;
+                        if c != '\n' {
+                            map.push(c);
+                        }
+                    }
+                }
+                if val > 0x7f {
+                    println!("{}", val);
+                }
+            }
+            State::Input(cookie) => {
+                if height == 0 {
+                    height = map.len() / width;
+                    for y in 1..height - 1 {
+                        for x in 1..width - 1 {
+                            if map[y * width + x] == '#'
+                                && map[y * width + x - 1] == '#'
+                                && map[y * width + x + 1] == '#'
+                                && map[(y - 1) * width + x] == '#'
+                                && map[(y + 1) * width + x] == '#'
+                            {
+                                alignment += y * x;
+                                map[y * width + x] = 'O';
+                            }
+                        }
+                    }
+                    println!("{}", alignment);
+                }
+                match program_it.next() {
+                    Some(c) => {
+                        cookie.set(c as i128);
+                    }
+                    None => unreachable!(),
+                }
+            }
+            State::Halted => break,
+        }
+    }
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    day16()
+    day17()
 }
