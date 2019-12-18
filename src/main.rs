@@ -2,8 +2,9 @@
 
 use int_code::{IntCode, State};
 use interner::Interner;
+use priority_queue::PriorityQueue;
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::error::Error;
 use std::fmt::Write;
 use std::fs::{self, File};
@@ -1024,6 +1025,313 @@ n
     Ok(())
 }
 
+fn day18() -> Result<(), Box<dyn Error>> {
+    let file = File::open("day18.txt")?;
+    let reader = BufReader::new(file);
+
+    let mut map = Vec::new();
+    let mut width = 0;
+    let (mut x_start, mut y_start) = (0, 0);
+    let mut num_keys = 0;
+    for (y, line) in reader.lines().enumerate() {
+        let line = line?;
+        width = line.len();
+        for (x, c) in line.chars().enumerate() {
+            if c == '@' {
+                x_start = x;
+                y_start = y;
+                map.push('@');
+            } else {
+                map.push(c);
+
+                if ('a'..='z').contains(&c) {
+                    num_keys += 1;
+                }
+            }
+        }
+    }
+
+    let height = map.len() / width;
+
+    const D: [(isize, isize); 4] = [(0, -1), (-1, 0), (0, 1), (1, 0)];
+
+    let mut frontier = PriorityQueue::new();
+    frontier.push((0, x_start, y_start), 0);
+    let mut visited = HashSet::new();
+    while let Some(((keys, x, y), d1)) = frontier.pop() {
+        if keys == (1 << num_keys) - 1 {
+            println!("Reached goal with cost {}", -d1);
+            break;
+        }
+        visited.insert((keys, x, y));
+
+        let mut dist = vec![i16::max_value(); width * height];
+        let mut queue = VecDeque::new();
+        dist[y * width + x] = 0;
+        queue.push_back((x, y, 0));
+        while let Some((x, y, d)) = queue.pop_front() {
+            let c = map[y * width + x];
+            if ('a'..='z').contains(&c) && keys & (1 << (c as u8 - b'a' as u8)) == 0 {
+                let nkeys = keys | (1 << (c as u8 - b'a' as u8));
+                if !visited.contains(&(nkeys, x, y)) {
+                    let nd = d1 - d;
+                    let mut found = false;
+                    frontier.change_priority_by(&(nkeys, x, y), |p| {
+                        found = true;
+                        if nd > p {
+                            nd
+                        } else {
+                            p
+                        }
+                    });
+                    if !found {
+                        frontier.push((nkeys, x, y), nd);
+                    }
+                }
+            }
+            for k in 0..4 {
+                let (nx, ny) = (
+                    (x as isize + D[k].0) as usize,
+                    (y as isize + D[k].1) as usize,
+                );
+                let c = map[ny * width + nx];
+                if c == '#' {
+                    continue;
+                }
+                if ('A'..='Z').contains(&c) && keys & (1 << (c as u8 - b'A' as u8)) == 0 {
+                    continue;
+                }
+                if dist[ny * width + nx] <= d + 1 {
+                    continue;
+                }
+                dist[ny * width + nx] = d + 1;
+                queue.push_back((nx, ny, d + 1));
+            }
+        }
+    }
+
+    map[y_start * width + x_start] = '#';
+    map[y_start * width + x_start - 1] = '#';
+    map[y_start * width + x_start + 1] = '#';
+    map[(y_start - 1) * width + x_start] = '#';
+    map[(y_start + 1) * width + x_start] = '#';
+    map[(y_start - 1) * width + x_start - 1] = '@';
+    map[(y_start - 1) * width + x_start + 1] = '@';
+    map[(y_start + 1) * width + x_start - 1] = '@';
+    map[(y_start + 1) * width + x_start + 1] = '@';
+    let mut frontier = PriorityQueue::new();
+    frontier.push(
+        (
+            0,
+            x_start - 1,
+            y_start - 1,
+            x_start - 1,
+            y_start + 1,
+            x_start + 1,
+            y_start - 1,
+            x_start + 1,
+            y_start + 1,
+        ),
+        0,
+    );
+
+    let mut visited = HashSet::new();
+    while let Some(((keys, x1, y1, x2, y2, x3, y3, x4, y4), d1)) = frontier.pop() {
+        if keys == (1 << num_keys) - 1 {
+            println!("Reached goal with cost {}", -d1);
+            break;
+        }
+        let mut keys_str = String::new();
+        for i in 0..num_keys {
+            if (keys & (1 << i)) != 0 {
+                keys_str.push((i + 'a' as u8) as char);
+            }
+        }
+        visited.insert((keys, x1, y1, x2, y2, x3, y3, x4, y4));
+
+        let mut dist = vec![i16::max_value(); width * height];
+        let mut queue = VecDeque::new();
+        dist[y1 * width + x1] = 0;
+        queue.push_back((x1, y1, 0));
+        while let Some((x, y, d)) = queue.pop_front() {
+            let c = map[y * width + x];
+            if ('a'..='z').contains(&c) && keys & (1 << (c as u8 - b'a' as u8)) == 0 {
+                let nkeys = keys | (1 << (c as u8 - b'a' as u8));
+                let p = (nkeys, x, y, x2, y2, x3, y3, x4, y4);
+                if !visited.contains(&p) {
+                    let nd = d1 - d;
+                    let mut found = false;
+                    frontier.change_priority_by(&p, |p| {
+                        found = true;
+                        if nd > p {
+                            nd
+                        } else {
+                            p
+                        }
+                    });
+                    if !found {
+                        frontier.push(p, nd);
+                    }
+                }
+            }
+            for k in 0..4 {
+                let (nx, ny) = (
+                    (x as isize + D[k].0) as usize,
+                    (y as isize + D[k].1) as usize,
+                );
+                let c = map[ny * width + nx];
+                if c == '#' {
+                    continue;
+                }
+                if ('A'..='Z').contains(&c) && keys & (1 << (c as u8 - b'A' as u8)) == 0 {
+                    continue;
+                }
+                if dist[ny * width + nx] <= d + 1 {
+                    continue;
+                }
+                dist[ny * width + nx] = d + 1;
+                queue.push_back((nx, ny, d + 1));
+            }
+        }
+
+        let mut dist = vec![i16::max_value(); width * height];
+        let mut queue = VecDeque::new();
+        dist[y2 * width + x2] = 0;
+        queue.push_back((x2, y2, 0));
+        while let Some((x, y, d)) = queue.pop_front() {
+            let c = map[y * width + x];
+            if ('a'..='z').contains(&c) && keys & (1 << (c as u8 - b'a' as u8)) == 0 {
+                let nkeys = keys | (1 << (c as u8 - b'a' as u8));
+                let p = (nkeys, x1, y1, x, y, x3, y3, x4, y4);
+                if !visited.contains(&p) {
+                    let nd = d1 - d;
+                    let mut found = false;
+                    frontier.change_priority_by(&p, |p| {
+                        found = true;
+                        if nd > p {
+                            nd
+                        } else {
+                            p
+                        }
+                    });
+                    if !found {
+                        frontier.push(p, nd);
+                    }
+                }
+            }
+            for k in 0..4 {
+                let (nx, ny) = (
+                    (x as isize + D[k].0) as usize,
+                    (y as isize + D[k].1) as usize,
+                );
+                let c = map[ny * width + nx];
+                if c == '#' {
+                    continue;
+                }
+                if ('A'..='Z').contains(&c) && keys & (1 << (c as u8 - b'A' as u8)) == 0 {
+                    continue;
+                }
+                if dist[ny * width + nx] <= d + 1 {
+                    continue;
+                }
+                dist[ny * width + nx] = d + 1;
+                queue.push_back((nx, ny, d + 1));
+            }
+        }
+
+        let mut dist = vec![i16::max_value(); width * height];
+        let mut queue = VecDeque::new();
+        dist[y3 * width + x3] = 0;
+        queue.push_back((x3, y3, 0));
+        while let Some((x, y, d)) = queue.pop_front() {
+            let c = map[y * width + x];
+            if ('a'..='z').contains(&c) && keys & (1 << (c as u8 - b'a' as u8)) == 0 {
+                let nkeys = keys | (1 << (c as u8 - b'a' as u8));
+                let p = (nkeys, x1, y1, x2, y2, x, y, x4, y4);
+                if !visited.contains(&p) {
+                    let nd = d1 - d;
+                    let mut found = false;
+                    frontier.change_priority_by(&p, |p| {
+                        found = true;
+                        if nd > p {
+                            nd
+                        } else {
+                            p
+                        }
+                    });
+                    if !found {
+                        frontier.push(p, nd);
+                    }
+                }
+            }
+            for k in 0..4 {
+                let (nx, ny) = (
+                    (x as isize + D[k].0) as usize,
+                    (y as isize + D[k].1) as usize,
+                );
+                let c = map[ny * width + nx];
+                if c == '#' {
+                    continue;
+                }
+                if ('A'..='Z').contains(&c) && keys & (1 << (c as u8 - b'A' as u8)) == 0 {
+                    continue;
+                }
+                if dist[ny * width + nx] <= d + 1 {
+                    continue;
+                }
+                dist[ny * width + nx] = d + 1;
+                queue.push_back((nx, ny, d + 1));
+            }
+        }
+
+        let mut dist = vec![i16::max_value(); width * height];
+        let mut queue = VecDeque::new();
+        dist[y4 * width + x4] = 0;
+        queue.push_back((x4, y4, 0));
+        while let Some((x, y, d)) = queue.pop_front() {
+            let c = map[y * width + x];
+            if ('a'..='z').contains(&c) && keys & (1 << (c as u8 - b'a' as u8)) == 0 {
+                let nkeys = keys | (1 << (c as u8 - b'a' as u8));
+                let p = (nkeys, x1, y1, x2, y2, x3, y3, x, y);
+                if !visited.contains(&p) {
+                    let nd = d1 - d;
+                    let mut found = false;
+                    frontier.change_priority_by(&p, |p| {
+                        found = true;
+                        if nd > p {
+                            nd
+                        } else {
+                            p
+                        }
+                    });
+                    if !found {
+                        frontier.push(p, nd);
+                    }
+                }
+            }
+            for k in 0..4 {
+                let (nx, ny) = (
+                    (x as isize + D[k].0) as usize,
+                    (y as isize + D[k].1) as usize,
+                );
+                let c = map[ny * width + nx];
+                if c == '#' {
+                    continue;
+                }
+                if ('A'..='Z').contains(&c) && keys & (1 << (c as u8 - b'A' as u8)) == 0 {
+                    continue;
+                }
+                if dist[ny * width + nx] <= d + 1 {
+                    continue;
+                }
+                dist[ny * width + nx] = d + 1;
+                queue.push_back((nx, ny, d + 1));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    day17()
+    day18()
 }
