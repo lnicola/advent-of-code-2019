@@ -1332,6 +1332,118 @@ fn day18() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn day19() -> Result<(), Box<dyn Error>> {
+    let program = fs::read_to_string("day19.txt")?
+        .trim_end()
+        .split(',')
+        .map(|v| v.parse::<i128>())
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let vm = IntCode::from(program);
+    let mut cnt = 0;
+    let (x0, y0) = (0, 0);
+    let width = 50;
+    let height = 50;
+    let mut map = vec![false; width * height];
+    for y in 0..height {
+        for x in 0..width {
+            let mut vm = vm.clone();
+            match vm.run() {
+                State::Input(cookie) => cookie.set(x0 + x as i128),
+                _ => unreachable!(),
+            }
+            match vm.run() {
+                State::Input(cookie) => cookie.set(y0 + y as i128),
+                _ => unreachable!(),
+            }
+            match vm.run() {
+                State::Output(val) => {
+                    if val == 1 {
+                        map[y * width + x] = true;
+                        cnt += 1;
+                    } else {
+                        map[y * width + x] = false;
+                    }
+                }
+                _ => unreachable!(),
+            }
+            match vm.run() {
+                State::Halted => {}
+                _ => unreachable!(),
+            }
+        }
+    }
+    println!("{}", cnt);
+    let (x0, y0) = (1509, 773);
+    let mut cnt = 0;
+    let width = 100;
+    let height = 100;
+    let mut map = vec![false; width * height];
+    for y in 0..height {
+        for x in 0..width {
+            let mut vm = vm.clone();
+            match vm.run() {
+                State::Input(cookie) => cookie.set(x0 + x as i128),
+                _ => unreachable!(),
+            }
+            match vm.run() {
+                State::Input(cookie) => cookie.set(y0 + y as i128),
+                _ => unreachable!(),
+            }
+            match vm.run() {
+                State::Output(val) => {
+                    if val == 1 {
+                        map[y * width + x] = true;
+                        cnt += 1;
+                    } else {
+                        map[y * width + x] = false;
+                    }
+                }
+                _ => unreachable!(),
+            }
+            match vm.run() {
+                State::Halted => {}
+                _ => unreachable!(),
+            }
+        }
+    }
+    println!("{} {}", cnt, x0 * 10_000 + y0);
+    Ok(())
+}
+
+fn day20() -> Result<(), Box<dyn Error>> {
+    let file = File::open("day20.txt")?;
+    let reader = BufReader::new(file);
+
+    let mut map = Vec::new();
+    let mut width = 0;
+    let (mut x_start, mut y_start) = (0, 0);
+    let mut num_keys = 0;
+    for (y, line) in reader.lines().enumerate() {
+        let line = line?;
+        width = line.len();
+        for (x, c) in line.chars().enumerate() {
+            if c == '@' {
+                x_start = x;
+                y_start = y;
+                map.push('@');
+            } else {
+                map.push(c);
+
+                if ('a'..='z').contains(&c) {
+                    num_keys += 1;
+                }
+            }
+        }
+    }
+
+    let height = map.len() / width;
+
+    const D: [(isize, isize); 4] = [(0, -1), (-1, 0), (0, 1), (1, 0)];
+
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    day18()
+    day19()
 }
