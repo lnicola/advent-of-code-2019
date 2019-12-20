@@ -1060,7 +1060,7 @@ fn day18() -> Result<(), Box<dyn Error>> {
     let mut visited = HashSet::new();
     while let Some(((keys, x, y), d1)) = frontier.pop() {
         if keys == (1 << num_keys) - 1 {
-            println!("Reached goal with cost {}", -d1);
+            print!("{} ", -d1);
             break;
         }
         visited.insert((keys, x, y));
@@ -1138,7 +1138,7 @@ fn day18() -> Result<(), Box<dyn Error>> {
     let mut visited = HashSet::new();
     while let Some(((keys, x1, y1, x2, y2, x3, y3, x4, y4), d1)) = frontier.pop() {
         if keys == (1 << num_keys) - 1 {
-            println!("Reached goal with cost {}", -d1);
+            println!("{}", -d1);
             break;
         }
         let mut keys_str = String::new();
@@ -1339,71 +1339,48 @@ fn day19() -> Result<(), Box<dyn Error>> {
         .map(|v| v.parse::<i128>())
         .collect::<Result<Vec<_>, _>>()?;
 
+    fn run(mut vm: IntCode, x: i128, y: i128) -> bool {
+        match vm.run() {
+            State::Input(cookie) => cookie.set(x as i128),
+            _ => unreachable!(),
+        }
+        match vm.run() {
+            State::Input(cookie) => cookie.set(y as i128),
+            _ => unreachable!(),
+        }
+        match vm.run() {
+            State::Output(val) => {
+                return val == 1;
+            }
+            _ => unreachable!(),
+        }
+    }
+
     let vm = IntCode::from(program);
     let mut cnt = 0;
     let (x0, y0) = (0, 0);
     let width = 50;
     let height = 50;
-    let mut map = vec![false; width * height];
     for y in 0..height {
         for x in 0..width {
-            let mut vm = vm.clone();
-            match vm.run() {
-                State::Input(cookie) => cookie.set(x0 + x as i128),
-                _ => unreachable!(),
-            }
-            match vm.run() {
-                State::Input(cookie) => cookie.set(y0 + y as i128),
-                _ => unreachable!(),
-            }
-            match vm.run() {
-                State::Output(val) => {
-                    if val == 1 {
-                        map[y * width + x] = true;
-                        cnt += 1;
-                    } else {
-                        map[y * width + x] = false;
-                    }
-                }
-                _ => unreachable!(),
-            }
-            match vm.run() {
-                State::Halted => {}
-                _ => unreachable!(),
+            if run(vm.clone(), x0 + x as i128, y0 + y as i128) {
+                print!("#");
+                cnt += 1;
+            } else {
+                print!(".");
             }
         }
+        println!();
     }
     println!("{}", cnt);
     let (x0, y0) = (1509, 773);
     let mut cnt = 0;
     let width = 100;
     let height = 100;
-    let mut map = vec![false; width * height];
     for y in 0..height {
         for x in 0..width {
-            let mut vm = vm.clone();
-            match vm.run() {
-                State::Input(cookie) => cookie.set(x0 + x as i128),
-                _ => unreachable!(),
-            }
-            match vm.run() {
-                State::Input(cookie) => cookie.set(y0 + y as i128),
-                _ => unreachable!(),
-            }
-            match vm.run() {
-                State::Output(val) => {
-                    if val == 1 {
-                        map[y * width + x] = true;
-                        cnt += 1;
-                    } else {
-                        map[y * width + x] = false;
-                    }
-                }
-                _ => unreachable!(),
-            }
-            match vm.run() {
-                State::Halted => {}
-                _ => unreachable!(),
+            if run(vm.clone(), x0 + x as i128, y0 + y as i128) {
+                cnt += 1;
             }
         }
     }
@@ -1417,33 +1394,184 @@ fn day20() -> Result<(), Box<dyn Error>> {
 
     let mut map = Vec::new();
     let mut width = 0;
-    let (mut x_start, mut y_start) = (0, 0);
-    let mut num_keys = 0;
-    for (y, line) in reader.lines().enumerate() {
+    for line in reader.lines() {
         let line = line?;
         width = line.len();
-        for (x, c) in line.chars().enumerate() {
-            if c == '@' {
-                x_start = x;
-                y_start = y;
-                map.push('@');
-            } else {
-                map.push(c);
-
-                if ('a'..='z').contains(&c) {
-                    num_keys += 1;
-                }
-            }
+        for c in line.chars() {
+            map.push(c);
         }
     }
 
     let height = map.len() / width;
 
-    const D: [(isize, isize); 4] = [(0, -1), (-1, 0), (0, 1), (1, 0)];
+    let mut portals = HashMap::new();
+    let mut pp = HashMap::new();
+    for y in 0..height {
+        for x in 0..width {
+            let c = map[y * width + x];
+            if ('A'..='Z').contains(&c) {
+                if x < width - 1 {
+                    let cr = map[y * width + x + 1];
+                    if ('A'..='Z').contains(&cr) {
+                        if x < width - 2 && map[y * width + x + 2] == '.' {
+                            if portals.contains_key(&(c, cr)) {
+                                let (xx, yy) = portals[&(c, cr)];
+                                pp.insert((x + 2, y), (xx, yy));
+                                pp.insert((xx, yy), (x + 2, y));
+                            } else {
+                                portals.insert((c, cr), (x + 2, y));
+                            }
+                        } else if x > 1 && map[y * width + x - 1] == '.' {
+                            if portals.contains_key(&(c, cr)) {
+                                let (xx, yy) = portals[&(c, cr)];
+                                pp.insert((x - 1, y), (xx, yy));
+                                pp.insert((xx, yy), (x - 1, y));
+                            } else {
+                                portals.insert((c, cr), (x - 1, y));
+                            }
+                        }
+                    }
+                }
+                if y < height - 1 {
+                    let cb = map[(y + 1) * width + x];
+                    if ('A'..='Z').contains(&cb) {
+                        if y < height - 2 && map[(y + 2) * width + x] == '.' {
+                            if portals.contains_key(&(c, cb)) {
+                                let (xx, yy) = portals[&(c, cb)];
+                                pp.insert((x, y + 2), (xx, yy));
+                                pp.insert((xx, yy), (x, y + 2));
+                            } else {
+                                portals.insert((c, cb), (x, y + 2));
+                            }
+                        } else if y > 1 && map[(y - 1) * width + x] == '.' {
+                            if portals.contains_key(&(c, cb)) {
+                                let (xx, yy) = portals[&(c, cb)];
+                                pp.insert((x, y - 1), (xx, yy));
+                                pp.insert((xx, yy), (x, y - 1));
+                            } else {
+                                portals.insert((c, cb), (x, y - 1));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let (x_start, y_start) = portals[&('A', 'A')];
+    let (x_stop, y_stop) = portals[&('Z', 'Z')];
 
+    let mut frontier = PriorityQueue::new();
+    frontier.push((x_start, y_start), 0);
+    let mut visited = HashSet::new();
+    while let Some(((x, y), d1)) = frontier.pop() {
+        if (x, y) == (x_stop, y_stop) {
+            print!("{} ", -d1);
+            break;
+        }
+        visited.insert((x, y));
+
+        for k in 0..4 {
+            let (nx, ny) = (
+                (x as isize + D[k].0) as usize,
+                (y as isize + D[k].1) as usize,
+            );
+            let c = map[ny * width + nx];
+            if let Some(&(nx, ny)) = pp.get(&(nx, ny)) {
+                if !visited.contains(&(nx, ny)) {
+                    let nd = d1 - 2;
+                    let mut found = false;
+                    frontier.change_priority_by(&(nx, ny), |p| {
+                        found = true;
+                        if nd > p {
+                            nd
+                        } else {
+                            p
+                        }
+                    });
+                    if !found {
+                        frontier.push((nx, ny), nd);
+                    }
+                }
+            } else if c == '.' {
+                if !visited.contains(&(nx, ny)) {
+                    let nd = d1 - 1;
+                    let mut found = false;
+                    frontier.change_priority_by(&(nx, ny), |p| {
+                        found = true;
+                        if nd > p {
+                            nd
+                        } else {
+                            p
+                        }
+                    });
+                    if !found {
+                        frontier.push((nx, ny), nd);
+                    }
+                }
+            }
+        }
+    }
+    const D: [(isize, isize); 4] = [(0, -1), (-1, 0), (0, 1), (1, 0)];
+    let mut frontier = PriorityQueue::new();
+    frontier.push((0, x_start, y_start), 0);
+    let mut visited = HashSet::new();
+    while let Some(((level, x1, y1), d1)) = frontier.pop() {
+        if (level, x1, y1) == (0, x_stop, y_stop) {
+            println!("{}", -d1);
+            break;
+        }
+        visited.insert((level, x1, y1));
+
+        if let Some(&(nx, ny)) = pp.get(&(x1, y1)) {
+            let outer = x1 == 2 || x1 == width - 3 || y1 == 2 || y1 == height - 3;
+            if level > 0 || !outer {
+                let nlevel = if outer { level - 1 } else { level + 1 };
+                if !visited.contains(&(nlevel, nx, ny)) {
+                    let nd = d1 - 1;
+                    let mut found = false;
+                    frontier.change_priority_by(&(nlevel, nx, ny), |p| {
+                        found = true;
+                        if nd > p {
+                            nd
+                        } else {
+                            p
+                        }
+                    });
+                    if !found {
+                        frontier.push((nlevel, nx, ny), nd);
+                    }
+                }
+            }
+        }
+
+        for k in 0..4 {
+            let (nx, ny) = (
+                (x1 as isize + D[k].0) as usize,
+                (y1 as isize + D[k].1) as usize,
+            );
+            if map[ny * width + nx] == '.' {
+                let nlevel = level;
+                if !visited.contains(&(nlevel, nx, ny)) {
+                    let nd = d1 - 1;
+                    let mut found = false;
+                    frontier.change_priority_by(&(nlevel, nx, ny), |p| {
+                        found = true;
+                        if nd > p {
+                            nd
+                        } else {
+                            p
+                        }
+                    });
+                    if !found {
+                        frontier.push((nlevel, nx, ny), nd);
+                    }
+                }
+            }
+        }
+    }
     Ok(())
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    day19()
+    day20()
 }
