@@ -3,6 +3,7 @@
 use int_code::{IntCode, State};
 use interner::Interner;
 use priority_queue::PriorityQueue;
+use priority_queue_ext::PriorityQueueExt;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::error::Error;
@@ -15,6 +16,7 @@ mod int_code;
 mod interner;
 mod iterator;
 mod num;
+mod priority_queue_ext;
 
 fn day1() -> Result<(), Box<dyn Error>> {
     let file = File::open("day1.txt")?;
@@ -1073,20 +1075,10 @@ fn day18() -> Result<(), Box<dyn Error>> {
             let c = map[y * width + x];
             if ('a'..='z').contains(&c) && keys & (1 << (c as u8 - b'a' as u8)) == 0 {
                 let nkeys = keys | (1 << (c as u8 - b'a' as u8));
-                if !visited.contains(&(nkeys, x, y)) {
+                let p = (nkeys, x, y);
+                if !visited.contains(&p) {
                     let nd = d1 - d;
-                    let mut found = false;
-                    frontier.change_priority_by(&(nkeys, x, y), |p| {
-                        found = true;
-                        if nd > p {
-                            nd
-                        } else {
-                            p
-                        }
-                    });
-                    if !found {
-                        frontier.push((nkeys, x, y), nd);
-                    }
+                    frontier.push_increase(p, nd);
                 }
             }
             for k in 0..4 {
@@ -1160,18 +1152,7 @@ fn day18() -> Result<(), Box<dyn Error>> {
                 let p = (nkeys, x, y, x2, y2, x3, y3, x4, y4);
                 if !visited.contains(&p) {
                     let nd = d1 - d;
-                    let mut found = false;
-                    frontier.change_priority_by(&p, |p| {
-                        found = true;
-                        if nd > p {
-                            nd
-                        } else {
-                            p
-                        }
-                    });
-                    if !found {
-                        frontier.push(p, nd);
-                    }
+                    frontier.push_increase(p, nd);
                 }
             }
             for k in 0..4 {
@@ -1205,18 +1186,7 @@ fn day18() -> Result<(), Box<dyn Error>> {
                 let p = (nkeys, x1, y1, x, y, x3, y3, x4, y4);
                 if !visited.contains(&p) {
                     let nd = d1 - d;
-                    let mut found = false;
-                    frontier.change_priority_by(&p, |p| {
-                        found = true;
-                        if nd > p {
-                            nd
-                        } else {
-                            p
-                        }
-                    });
-                    if !found {
-                        frontier.push(p, nd);
-                    }
+                    frontier.push_increase(p, nd);
                 }
             }
             for k in 0..4 {
@@ -1250,18 +1220,7 @@ fn day18() -> Result<(), Box<dyn Error>> {
                 let p = (nkeys, x1, y1, x2, y2, x, y, x4, y4);
                 if !visited.contains(&p) {
                     let nd = d1 - d;
-                    let mut found = false;
-                    frontier.change_priority_by(&p, |p| {
-                        found = true;
-                        if nd > p {
-                            nd
-                        } else {
-                            p
-                        }
-                    });
-                    if !found {
-                        frontier.push(p, nd);
-                    }
+                    frontier.push_increase(p, nd);
                 }
             }
             for k in 0..4 {
@@ -1295,18 +1254,7 @@ fn day18() -> Result<(), Box<dyn Error>> {
                 let p = (nkeys, x1, y1, x2, y2, x3, y3, x, y);
                 if !visited.contains(&p) {
                     let nd = d1 - d;
-                    let mut found = false;
-                    frontier.change_priority_by(&p, |p| {
-                        found = true;
-                        if nd > p {
-                            nd
-                        } else {
-                            p
-                        }
-                    });
-                    if !found {
-                        frontier.push(p, nd);
-                    }
+                    frontier.push_increase(p, nd);
                 }
             }
             for k in 0..4 {
@@ -1477,36 +1425,16 @@ fn day20() -> Result<(), Box<dyn Error>> {
             );
             let c = map[ny * width + nx];
             if let Some(&(nx, ny)) = pp.get(&(nx, ny)) {
-                if !visited.contains(&(nx, ny)) {
+                let p = (nx, ny);
+                if !visited.contains(&p) {
                     let nd = d1 - 2;
-                    let mut found = false;
-                    frontier.change_priority_by(&(nx, ny), |p| {
-                        found = true;
-                        if nd > p {
-                            nd
-                        } else {
-                            p
-                        }
-                    });
-                    if !found {
-                        frontier.push((nx, ny), nd);
-                    }
+                    frontier.push_increase(p, nd);
                 }
             } else if c == '.' {
-                if !visited.contains(&(nx, ny)) {
+                let p = (nx, ny);
+                if !visited.contains(&p) {
                     let nd = d1 - 1;
-                    let mut found = false;
-                    frontier.change_priority_by(&(nx, ny), |p| {
-                        found = true;
-                        if nd > p {
-                            nd
-                        } else {
-                            p
-                        }
-                    });
-                    if !found {
-                        frontier.push((nx, ny), nd);
-                    }
+                    frontier.push_increase(p, nd);
                 }
             }
         }
@@ -1526,20 +1454,10 @@ fn day20() -> Result<(), Box<dyn Error>> {
             let outer = x1 == 2 || x1 == width - 3 || y1 == 2 || y1 == height - 3;
             if level > 0 || !outer {
                 let nlevel = if outer { level - 1 } else { level + 1 };
-                if !visited.contains(&(nlevel, nx, ny)) {
+                let p = (nlevel, nx, ny);
+                if !visited.contains(&p) {
                     let nd = d1 - 1;
-                    let mut found = false;
-                    frontier.change_priority_by(&(nlevel, nx, ny), |p| {
-                        found = true;
-                        if nd > p {
-                            nd
-                        } else {
-                            p
-                        }
-                    });
-                    if !found {
-                        frontier.push((nlevel, nx, ny), nd);
-                    }
+                    frontier.push_increase(p, nd);
                 }
             }
         }
@@ -1551,20 +1469,10 @@ fn day20() -> Result<(), Box<dyn Error>> {
             );
             if map[ny * width + nx] == '.' {
                 let nlevel = level;
-                if !visited.contains(&(nlevel, nx, ny)) {
+                let p = (nlevel, nx, ny);
+                if !visited.contains(&p) {
                     let nd = d1 - 1;
-                    let mut found = false;
-                    frontier.change_priority_by(&(nlevel, nx, ny), |p| {
-                        found = true;
-                        if nd > p {
-                            nd
-                        } else {
-                            p
-                        }
-                    });
-                    if !found {
-                        frontier.push((nlevel, nx, ny), nd);
-                    }
+                    frontier.push_increase(p, nd);
                 }
             }
         }
@@ -1573,5 +1481,6 @@ fn day20() -> Result<(), Box<dyn Error>> {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    day18()?;
     day20()
 }
