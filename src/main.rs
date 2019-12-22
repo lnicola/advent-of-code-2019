@@ -2,6 +2,7 @@
 
 use int_code::{IntCode, State};
 use interner::Interner;
+use num::Zp;
 use priority_queue::PriorityQueue;
 use priority_queue_ext::PriorityQueueExt;
 use std::cmp::Ordering;
@@ -11,6 +12,7 @@ use std::fmt::Write;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 use std::iter;
+use std::ops::Mul;
 
 mod int_code;
 mod interner;
@@ -1480,7 +1482,166 @@ fn day20() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn day21() -> Result<(), Box<dyn Error>> {
+    let program = fs::read_to_string("day21.txt")?
+        .trim_end()
+        .split(',')
+        .map(|v| v.parse::<i128>())
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let mut vm = IntCode::from(program.clone());
+    let asm = r"OR A J
+AND B J
+AND C J
+NOT J J
+AND D J
+WALK
+";
+    let mut program_it = asm.chars();
+    loop {
+        match vm.run() {
+            State::Output(val) => {
+                if val > 0x7f {
+                    println!("{}", val);
+                } else {
+                    print!("{}", val as u8 as char);
+                }
+            }
+            State::Input(cookie) => match program_it.next() {
+                Some(c) => {
+                    cookie.set(c as i128);
+                }
+                None => unreachable!(),
+            },
+            State::Halted => break,
+        }
+    }
+
+    let mut vm = IntCode::from(program);
+    let asm = r"OR A J
+AND B J
+AND C J
+NOT J J
+AND D J
+OR E T
+OR H T
+AND T J
+RUN
+";
+    let mut program_it = asm.chars();
+    loop {
+        match vm.run() {
+            State::Output(val) => {
+                if val > 0x7f {
+                    println!("{}", val);
+                } else {
+                    print!("{}", val as u8 as char);
+                }
+            }
+            State::Input(cookie) => match program_it.next() {
+                Some(c) => {
+                    cookie.set(c as i128);
+                }
+                None => unreachable!(),
+            },
+            State::Halted => break,
+        }
+    }
+    Ok(())
+}
+
+fn day22() -> Result<(), Box<dyn Error>> {
+    let file = File::open("day22.txt")?;
+    let reader = BufReader::new(file);
+
+    let mut ops = Vec::new();
+    for line in reader.lines() {
+        let line = line?;
+        if line == "deal into new stack" {
+            ops.push((-1, -1));
+        } else if line.starts_with("cut ") {
+            let p = line[4..].parse::<i128>()?;
+            ops.push((1, -p));
+        } else {
+            let i = line[line.rfind(' ').unwrap() + 1..].parse()?;
+            ops.push((i, 0));
+        }
+    }
+
+    fn reduce(ops: &[(i128, i128)], n: i128) -> Shuffle {
+        let mut shuffle = Shuffle::identity(n);
+        for &(m, a) in ops {
+            let m = Shuffle { m, a, n };
+            shuffle = shuffle * m;
+        }
+        shuffle
+    }
+
+    #[derive(Copy, Clone)]
+    struct Shuffle {
+        m: i128,
+        a: i128,
+        n: i128,
+    }
+
+    impl Shuffle {
+        fn identity(n: i128) -> Self {
+            Self { m: 1, a: 0, n }
+        }
+
+        fn apply(&self, p: i128) -> i128 {
+            (p * self.m + self.n + self.a) % self.n
+        }
+    }
+
+    impl Mul for Shuffle {
+        type Output = Self;
+
+        fn mul(self, rhs: Self) -> Self::Output {
+            assert_eq!(self.n, rhs.n);
+
+            let (m, a) = (Zp::new(rhs.m, self.n), Zp::new(rhs.a, self.n));
+            let a = Zp::new(self.a, self.n) * m + a;
+            let m = Zp::new(self.m, self.n) * m;
+
+            Self {
+                m: m.n,
+                a: a.n,
+                n: self.n,
+            }
+        }
+    }
+
+    fn pow(mut x: Shuffle, mut k: i128) -> Shuffle {
+        let mut t = Shuffle::identity(x.n);
+        if k == 0 {
+            return t;
+        }
+        while k > 1 {
+            if k % 2 == 1 {
+                t = x * t;
+                x = x * x;
+                k /= 2;
+            } else {
+                x = x * x;
+                k /= 2;
+            }
+        }
+        x * t
+    }
+
+    let n = 10007;
+    print!("{} ", reduce(&ops, n).apply(2019));
+
+    let n = 119315717514047;
+    let shuffle = reduce(&ops, n);
+    let Shuffle { m, a, .. } = pow(shuffle, 101741582076661);
+    let inv = modinverse::modinverse(m, n).unwrap();
+    println!("{}", (Zp::new(n + 2020 - a, n) * Zp::new(inv, n)).n);
+
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    day18()?;
-    day20()
+    day22()
 }
