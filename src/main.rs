@@ -666,9 +666,7 @@ fn day13() -> Result<(), Box<dyn Error>> {
         };
         let y = match vm.run() {
             State::Output(val) => val,
-            _ => {
-                unreachable!();
-            }
+            _ => unreachable!(),
         };
         match vm.run() {
             State::Output(val) if x == -1 && y == 0 => score = val,
@@ -676,9 +674,7 @@ fn day13() -> Result<(), Box<dyn Error>> {
             State::Output(2) => *blocks.get_or_insert(0) += 1,
             State::Output(3) => paddle_x = Some(x),
             State::Output(4) => ball_x = Some(x),
-            _ => {
-                unreachable!();
-            }
+            _ => unreachable!(),
         };
     }
     println!("{}", score);
@@ -1642,6 +1638,86 @@ fn day22() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn day23() -> Result<(), Box<dyn Error>> {
+    let program = fs::read_to_string("day23.txt")?
+        .trim_end()
+        .split(',')
+        .map(|v| v.parse::<i128>())
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let template = IntCode::from(program);
+    let mut computers = vec![template; 50];
+    for (i, vm) in computers.iter_mut().enumerate() {
+        match vm.run() {
+            State::Input(cookie) => cookie.set(i as i128),
+            _ => unreachable!(),
+        }
+    }
+    let mut buffers = vec![VecDeque::<(i128, i128)>::new(); computers.len()];
+    let mut prev_nat_y = 0;
+    let mut nat = (0, 0);
+    loop {
+        let mut idle = true;
+        for (i, vm) in computers.iter_mut().enumerate() {
+            #[derive(Copy, Clone)]
+            enum ComputerState {
+                Running,
+                SendAddr { addr: i128 },
+                SendX { addr: i128, x: i128 },
+                RecvX { y: i128 },
+            }
+
+            let mut state = ComputerState::Running;
+            loop {
+                match (state, vm.run()) {
+                    (ComputerState::Running, State::Output(addr)) => {
+                        idle = false;
+                        state = ComputerState::SendAddr { addr }
+                    }
+                    (ComputerState::SendAddr { addr }, State::Output(x)) => {
+                        state = ComputerState::SendX { addr, x }
+                    }
+                    (ComputerState::SendX { addr, x }, State::Output(y)) => {
+                        if addr == 255 {
+                            if nat == (0, 0) {
+                                print!("{} ", y);
+                            }
+                            nat = (x, y);
+                        } else {
+                            buffers[addr as usize].push_back((x, y));
+                        }
+                        break;
+                    }
+                    (ComputerState::Running, State::Input(cookie)) => {
+                        if let Some((x, y)) = buffers[i].pop_front() {
+                            idle = false;
+                            cookie.set(x);
+                            state = ComputerState::RecvX { y };
+                        } else {
+                            cookie.set(-1);
+                            break;
+                        }
+                    }
+                    (ComputerState::RecvX { y }, State::Input(cookie)) => {
+                        cookie.set(y);
+                        break;
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        }
+        if idle {
+            if prev_nat_y != 0 && nat.1 == prev_nat_y {
+                println!("{}", nat.1);
+                break;
+            }
+            buffers[0].push_back(nat);
+            prev_nat_y = nat.1;
+        }
+    }
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    day22()
+    day23()
 }
