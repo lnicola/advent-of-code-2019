@@ -1718,6 +1718,215 @@ fn day23() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn day24() -> Result<(), Box<dyn Error>> {
+    let file = File::open("day24.txt")?;
+    let reader = BufReader::new(file);
+
+    let mut map = [false; 25];
+    let mut new = [false; 25];
+    let mut levels = [[false; 25]; 401];
+    for (y, line) in reader.lines().enumerate() {
+        let line = line?;
+        for (x, c) in line.chars().enumerate() {
+            map[y * 5 + x] = c == '#';
+            levels[200][y * 5 + x] = c == '#';
+        }
+    }
+    let mut seen = HashSet::new();
+    loop {
+        let mut diversity = 0;
+        for y in 0..5 {
+            for x in 0..5 {
+                let mut neigh = 0;
+                if y > 0 && map[(y - 1) * 5 + x] {
+                    neigh += 1;
+                }
+                if y < 4 && map[(y + 1) * 5 + x] {
+                    neigh += 1;
+                }
+                if x > 0 && map[y * 5 + x - 1] {
+                    neigh += 1;
+                }
+                if x < 4 && map[y * 5 + x + 1] {
+                    neigh += 1;
+                }
+
+                new[y * 5 + x] = if map[y * 5 + x] && neigh != 1 {
+                    false
+                } else if !map[y * 5 + x] && (neigh == 1 || neigh == 2) {
+                    true
+                } else {
+                    map[y * 5 + x]
+                };
+
+                if new[y * 5 + x] {
+                    diversity |= 1 << (y * 5 + x);
+                }
+            }
+        }
+        map = new;
+        if !seen.insert(diversity) {
+            println!("{}", diversity);
+            break;
+        }
+    }
+
+    let mut new = [[false; 25]; 401];
+    let neighbours = |x: usize, y: usize| -> &'static [(isize, usize, usize)] {
+        match (x, y) {
+            (0, 0) => &[(-1, 2, 1), (-1, 1, 2), (0, 1, 0), (0, 0, 1)],
+            (1, 0) => &[(-1, 2, 1), (0, 0, 0), (0, 2, 0), (0, 1, 1)],
+            (2, 0) => &[(-1, 2, 1), (0, 1, 0), (0, 3, 0), (0, 2, 1)],
+            (3, 0) => &[(-1, 2, 1), (0, 2, 0), (0, 4, 0), (0, 3, 1)],
+            (4, 0) => &[(-1, 2, 1), (-1, 3, 2), (0, 3, 0), (0, 4, 1)],
+            (0, 4) => &[(-1, 2, 3), (-1, 1, 2), (0, 0, 3), (0, 1, 4)],
+            (1, 4) => &[(-1, 2, 3), (0, 1, 3), (0, 0, 4), (0, 2, 4)],
+            (2, 4) => &[(-1, 2, 3), (0, 2, 3), (0, 1, 4), (0, 3, 4)],
+            (3, 4) => &[(-1, 2, 3), (0, 3, 3), (0, 2, 4), (0, 4, 4)],
+            (4, 4) => &[(-1, 2, 3), (-1, 3, 2), (0, 4, 3), (0, 3, 4)],
+            (0, 1) => &[(-1, 1, 2), (0, 0, 0), (0, 0, 2), (0, 1, 1)],
+            (0, 2) => &[(-1, 1, 2), (0, 0, 1), (0, 0, 3), (0, 1, 2)],
+            (0, 3) => &[(-1, 1, 2), (0, 0, 2), (0, 0, 4), (0, 1, 3)],
+            (4, 1) => &[(-1, 3, 2), (0, 4, 0), (0, 4, 2), (0, 3, 1)],
+            (4, 2) => &[(-1, 3, 2), (0, 4, 1), (0, 4, 3), (0, 3, 2)],
+            (4, 3) => &[(-1, 3, 2), (0, 4, 2), (0, 4, 4), (0, 3, 3)],
+            (1, 1) => &[(0, 1, 0), (0, 1, 2), (0, 0, 1), (0, 2, 1)],
+            (3, 1) => &[(0, 3, 0), (0, 3, 2), (0, 2, 1), (0, 4, 1)],
+            (1, 3) => &[(0, 1, 2), (0, 1, 4), (0, 0, 3), (0, 2, 3)],
+            (3, 3) => &[(0, 3, 2), (0, 3, 4), (0, 2, 3), (0, 4, 3)],
+            (2, 1) => &[
+                (1, 0, 0),
+                (1, 1, 0),
+                (1, 2, 0),
+                (1, 3, 0),
+                (1, 4, 0),
+                (0, 1, 1),
+                (0, 3, 1),
+                (0, 2, 0),
+            ],
+            (2, 3) => &[
+                (1, 0, 4),
+                (1, 1, 4),
+                (1, 2, 4),
+                (1, 3, 4),
+                (1, 4, 4),
+                (0, 1, 3),
+                (0, 3, 3),
+                (0, 2, 4),
+            ],
+            (1, 2) => &[
+                (1, 0, 0),
+                (1, 0, 1),
+                (1, 0, 2),
+                (1, 0, 3),
+                (1, 0, 4),
+                (0, 1, 1),
+                (0, 1, 3),
+                (0, 0, 2),
+            ],
+            (3, 2) => &[
+                (1, 4, 0),
+                (1, 4, 1),
+                (1, 4, 2),
+                (1, 4, 3),
+                (1, 4, 4),
+                (0, 3, 1),
+                (0, 3, 3),
+                (0, 4, 2),
+            ],
+            _ => unreachable!(),
+        }
+    };
+    for gen in 0..200 {
+        for level in 200 - gen - 1..=200 + gen + 1 {
+            for y in 0..5 {
+                for x in 0..5 {
+                    if x == 2 && y == 2 {
+                        continue;
+                    }
+                    let mut neigh = 0;
+                    let curr = levels[level][y * 5 + x];
+                    for &(dl, nx, ny) in neighbours(x, y) {
+                        if dl == -1 && level == 0 || dl == 1 && level == 400 {
+                            continue;
+                        }
+                        let nl = (level as isize + dl) as usize;
+                        neigh += levels[nl][ny * 5 + nx] as i32;
+                    }
+
+                    new[level][y * 5 + x] = if curr && neigh != 1 {
+                        false
+                    } else if !curr && (neigh == 1 || neigh == 2) {
+                        true
+                    } else {
+                        curr
+                    };
+                }
+            }
+        }
+        levels = new;
+    }
+    let mut bugs = 0;
+    for level in 0..=400 {
+        for i in 0..25 {
+            if i != 12 && levels[level][i] {
+                bugs += 1;
+            }
+        }
+    }
+    println!("{}", bugs);
+    Ok(())
+}
+
+fn day25() -> Result<(), Box<dyn Error>> {
+    let program = fs::read_to_string("day25.txt")?
+        .trim_end()
+        .split(',')
+        .map(|v| v.parse::<i128>())
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let mut vm = IntCode::from(program);
+    let playthrough = r"
+east
+take sand
+west
+west
+north
+take wreath
+east
+take fixed point
+west
+south
+south
+east
+east
+east
+take space law space brochure
+south
+south
+west
+";
+    let mut it = playthrough.chars();
+    loop {
+        match vm.run() {
+            State::Output(val) => {
+                let c = val as u8 as char;
+                print!("{}", c);
+            }
+            State::Input(cookie) => {
+                if let Some(c) = it.next() {
+                    cookie.set(c as i128);
+                } else {
+                    break;
+                }
+            }
+            State::Halted => break,
+        }
+    }
+
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    day23()
+    day25()
 }
