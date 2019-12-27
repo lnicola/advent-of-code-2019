@@ -1,9 +1,8 @@
 #![allow(dead_code)]
 
-use crate::num::Zp;
-use ::num::Integer;
 use int_code::{IntCode, State};
 use interner::Interner;
+use num::Integer;
 use priority_queue::PriorityQueue;
 use priority_queue_ext::PriorityQueueExt;
 use std::cmp::Ordering;
@@ -13,12 +12,11 @@ use std::fmt::Write;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 use std::iter;
-use std::ops::Mul;
+use std::ops::{Mul, MulAssign};
 
 mod int_code;
 mod interner;
 mod iterator;
-mod num;
 mod priority_queue_ext;
 
 fn day1() -> Result<(), Box<dyn Error>> {
@@ -1565,11 +1563,14 @@ fn day22() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    pub fn modulo_mul(a: i128, b: i128, m: i128) -> i128 {
+        ((a + m) % m) * ((b + m) % m) % m
+    }
+
     fn reduce(ops: &[(i128, i128)], n: i128) -> Shuffle {
         let mut shuffle = Shuffle::identity(n);
         for &(m, a) in ops {
-            let m = Shuffle { m, a, n };
-            shuffle = shuffle * m;
+            shuffle *= Shuffle { m, a, n };
         }
         shuffle
     }
@@ -1594,18 +1595,23 @@ fn day22() -> Result<(), Box<dyn Error>> {
     impl Mul for Shuffle {
         type Output = Self;
 
-        fn mul(self, rhs: Self) -> Self::Output {
+        fn mul(mut self, rhs: Self) -> Self::Output {
             assert_eq!(self.n, rhs.n);
 
-            let (m, a) = (Zp::new(rhs.m, self.n), Zp::new(rhs.a, self.n));
-            let a = Zp::new(self.a, self.n) * m + a;
-            let m = Zp::new(self.m, self.n) * m;
+            self *= rhs;
+            self
+        }
+    }
 
-            Self {
-                m: m.n,
-                a: a.n,
-                n: self.n,
-            }
+    impl MulAssign for Shuffle {
+        fn mul_assign(&mut self, rhs: Self) {
+            assert_eq!(self.n, rhs.n);
+
+            let a = (modulo_mul(self.a, rhs.m, self.n) + rhs.a) % self.n;
+            let m = modulo_mul(self.m, rhs.m, self.n);
+
+            self.m = m;
+            self.a = a;
         }
     }
 
@@ -1616,11 +1622,11 @@ fn day22() -> Result<(), Box<dyn Error>> {
         }
         while k > 1 {
             if k % 2 == 1 {
-                t = x * t;
-                x = x * x;
+                t *= x;
+                x *= x;
                 k /= 2;
             } else {
-                x = x * x;
+                x *= x;
                 k /= 2;
             }
         }
@@ -1634,7 +1640,7 @@ fn day22() -> Result<(), Box<dyn Error>> {
     let shuffle = reduce(&ops, n);
     let Shuffle { m, a, .. } = pow(shuffle, 101741582076661);
     let inv = modinverse::modinverse(m, n).unwrap();
-    println!("{}", (Zp::new(n + 2020 - a, n) * Zp::new(inv, n)).n);
+    println!("{}", modulo_mul(n + 2020 - a, inv, n));
 
     Ok(())
 }
@@ -1929,5 +1935,5 @@ west
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    day12()
+    day22()
 }
