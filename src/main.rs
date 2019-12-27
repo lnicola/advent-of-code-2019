@@ -1,8 +1,9 @@
 #![allow(dead_code)]
 
+use crate::num::Zp;
+use ::num::Integer;
 use int_code::{IntCode, State};
 use interner::Interner;
-use num::Zp;
 use priority_queue::PriorityQueue;
 use priority_queue_ext::PriorityQueueExt;
 use std::cmp::Ordering;
@@ -562,7 +563,7 @@ fn day12() -> Result<(), Box<dyn Error>> {
     let mut vy = vec![0; py.len()];
     let mut vz = vec![0; pz.len()];
     let (mut states_x, mut states_y, mut states_z) = Default::default();
-    let (mut per_x, mut per_y, mut per_z) = Default::default();
+    let (mut per_x, mut per_y, mut per_z) = (None::<u64>, None::<u64>, None::<u64>);
     let mut time = 0u64;
 
     fn insert_state(states: &mut HashSet<Box<[i32]>>, p: &[i32], v: &[i32]) -> bool {
@@ -575,7 +576,7 @@ fn day12() -> Result<(), Box<dyn Error>> {
 
     loop {
         if let (Some(per_x), Some(per_y), Some(per_z)) = (per_x, per_y, per_z) {
-            let period = num::lcm3(per_x, per_y, per_z);
+            let period = per_x.lcm(&per_y).lcm(&per_z);
             println!("{}", period);
             break;
         }
@@ -1928,5 +1929,5 @@ west
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    day25()
+    day12()
 }
