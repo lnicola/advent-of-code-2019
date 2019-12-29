@@ -1564,7 +1564,7 @@ fn day22() -> Result<(), Box<dyn Error>> {
     }
 
     pub fn modulo_mul(a: i128, b: i128, m: i128) -> i128 {
-        ((a + m) % m) * ((b + m) % m) % m
+        (a * b).rem_euclid(m)
     }
 
     fn reduce(ops: &[(i128, i128)], n: i128) -> Shuffle {
@@ -1588,7 +1588,7 @@ fn day22() -> Result<(), Box<dyn Error>> {
         }
 
         fn apply(&self, p: i128) -> i128 {
-            (p * self.m + self.n + self.a) % self.n
+            (p * self.m + self.a).rem_euclid(self.n)
         }
     }
 
@@ -1607,7 +1607,7 @@ fn day22() -> Result<(), Box<dyn Error>> {
         fn mul_assign(&mut self, rhs: Self) {
             assert_eq!(self.n, rhs.n);
 
-            let a = (modulo_mul(self.a, rhs.m, self.n) + rhs.a) % self.n;
+            let a = (modulo_mul(self.a, rhs.m, self.n) + rhs.a).rem_euclid(self.n);
             let m = modulo_mul(self.m, rhs.m, self.n);
 
             self.m = m;
