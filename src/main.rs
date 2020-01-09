@@ -4,7 +4,6 @@ use int_code::{IntCode, State};
 use interner::Interner;
 use num::Integer;
 use priority_queue::PriorityQueue;
-use priority_queue_ext::PriorityQueueExt;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::error::Error;
@@ -17,7 +16,6 @@ use std::ops::{Mul, MulAssign};
 mod int_code;
 mod interner;
 mod iterator;
-mod priority_queue_ext;
 
 fn day1() -> Result<(), Box<dyn Error>> {
     let file = File::open("day1.txt")?;
