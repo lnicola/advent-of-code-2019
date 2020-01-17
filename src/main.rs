@@ -4,7 +4,7 @@ use int_code::{IntCode, State};
 use interner::Interner;
 use num::Integer;
 use priority_queue::PriorityQueue;
-use std::cmp::Ordering;
+use std::cmp::{Ordering, Reverse};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::error::Error;
 use std::fmt::Write;
@@ -1053,13 +1053,13 @@ fn day18() -> Result<(), Box<dyn Error>> {
     const D: [(isize, isize); 4] = [(0, -1), (-1, 0), (0, 1), (1, 0)];
 
     let mut frontier = PriorityQueue::new();
-    frontier.push((0, x_start, y_start), 0);
+    frontier.push((0, x_start, y_start), Reverse(0));
     let mut queue = VecDeque::new();
     let mut visited = HashSet::new();
     let mut dist = vec![i16::max_value(); width * height];
     while let Some(((keys, x, y), d1)) = frontier.pop() {
         if keys == (1 << num_keys) - 1 {
-            print!("{} ", -d1);
+            print!("{} ", d1.0);
             break;
         }
         visited.insert((keys, x, y));
@@ -1076,8 +1076,7 @@ fn day18() -> Result<(), Box<dyn Error>> {
                 let nkeys = keys | (1 << (c as u8 - b'a' as u8));
                 let p = (nkeys, x, y);
                 if !visited.contains(&p) {
-                    let nd = d1 - d;
-                    frontier.push_increase(p, nd);
+                    frontier.push_increase(p, Reverse(d1.0 + d));
                 }
             }
             for k in 0..4 {
@@ -1117,21 +1116,15 @@ fn day18() -> Result<(), Box<dyn Error>> {
             [x_start - 1, x_start - 1, x_start + 1, x_start + 1],
             [y_start - 1, y_start + 1, y_start - 1, y_start + 1],
         ),
-        0,
+        Reverse(0),
     );
 
     let mut visited = HashSet::new();
     let mut dist = vec![i16::max_value(); width * height];
     while let Some(((keys, rx, ry), d1)) = frontier.pop() {
         if keys == (1 << num_keys) - 1 {
-            println!("{}", -d1);
+            println!("{}", d1.0);
             break;
-        }
-        let mut keys_str = String::new();
-        for i in 0..num_keys {
-            if (keys & (1 << i)) != 0 {
-                keys_str.push((i + 'a' as u8) as char);
-            }
         }
         visited.insert((keys, rx, ry));
 
@@ -1152,8 +1145,7 @@ fn day18() -> Result<(), Box<dyn Error>> {
                     ny[r] = y;
                     let p = (nkeys, nx, ny);
                     if !visited.contains(&p) {
-                        let nd = d1 - d;
-                        frontier.push_increase(p, nd);
+                        frontier.push_increase(p, Reverse(d1.0 + d));
                     }
                 }
                 for k in 0..4 {
@@ -1309,11 +1301,11 @@ fn day20() -> Result<(), Box<dyn Error>> {
     let (x_stop, y_stop) = portals[&('Z', 'Z')];
 
     let mut frontier = PriorityQueue::new();
-    frontier.push((x_start, y_start), 0);
+    frontier.push((x_start, y_start), Reverse(0));
     let mut visited = HashSet::new();
     while let Some(((x, y), d1)) = frontier.pop() {
         if (x, y) == (x_stop, y_stop) {
-            print!("{} ", -d1);
+            print!("{} ", d1.0);
             break;
         }
         visited.insert((x, y));
@@ -1327,25 +1319,23 @@ fn day20() -> Result<(), Box<dyn Error>> {
             if let Some(&(nx, ny)) = pp.get(&(nx, ny)) {
                 let p = (nx, ny);
                 if !visited.contains(&p) {
-                    let nd = d1 - 2;
-                    frontier.push_increase(p, nd);
+                    frontier.push_increase(p, Reverse(d1.0 + 2));
                 }
             } else if c == '.' {
                 let p = (nx, ny);
                 if !visited.contains(&p) {
-                    let nd = d1 - 1;
-                    frontier.push_increase(p, nd);
+                    frontier.push_increase(p, Reverse(d1.0 + 1));
                 }
             }
         }
     }
     const D: [(isize, isize); 4] = [(0, -1), (-1, 0), (0, 1), (1, 0)];
     let mut frontier = PriorityQueue::new();
-    frontier.push((0, x_start, y_start), 0);
+    frontier.push((0, x_start, y_start), Reverse(0));
     let mut visited = HashSet::new();
     while let Some(((level, x1, y1), d1)) = frontier.pop() {
         if (level, x1, y1) == (0, x_stop, y_stop) {
-            println!("{}", -d1);
+            println!("{}", d1.0);
             break;
         }
         visited.insert((level, x1, y1));
@@ -1356,8 +1346,7 @@ fn day20() -> Result<(), Box<dyn Error>> {
                 let nlevel = if outer { level - 1 } else { level + 1 };
                 let p = (nlevel, nx, ny);
                 if !visited.contains(&p) {
-                    let nd = d1 - 1;
-                    frontier.push_increase(p, nd);
+                    frontier.push_increase(p, Reverse(d1.0 + 1));
                 }
             }
         }
@@ -1371,8 +1360,7 @@ fn day20() -> Result<(), Box<dyn Error>> {
                 let nlevel = level;
                 let p = (nlevel, nx, ny);
                 if !visited.contains(&p) {
-                    let nd = d1 - 1;
-                    frontier.push_increase(p, nd);
+                    frontier.push_increase(p, Reverse(d1.0 + 1));
                 }
             }
         }
@@ -1838,5 +1826,5 @@ west
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    day18()
+    day20()
 }
