@@ -1054,7 +1054,9 @@ fn day18() -> Result<(), Box<dyn Error>> {
 
     let mut frontier = PriorityQueue::new();
     frontier.push((0, x_start, y_start), 0);
+    let mut queue = VecDeque::new();
     let mut visited = HashSet::new();
+    let mut dist = vec![i16::max_value(); width * height];
     while let Some(((keys, x, y), d1)) = frontier.pop() {
         if keys == (1 << num_keys) - 1 {
             print!("{} ", -d1);
@@ -1062,8 +1064,10 @@ fn day18() -> Result<(), Box<dyn Error>> {
         }
         visited.insert((keys, x, y));
 
-        let mut dist = vec![i16::max_value(); width * height];
-        let mut queue = VecDeque::new();
+        for d in &mut dist {
+            *d = i16::max_value();
+        }
+
         dist[y * width + x] = 0;
         queue.push_back((x, y, 0));
         while let Some((x, y, d)) = queue.pop_front() {
@@ -1110,20 +1114,15 @@ fn day18() -> Result<(), Box<dyn Error>> {
     frontier.push(
         (
             0,
-            x_start - 1,
-            y_start - 1,
-            x_start - 1,
-            y_start + 1,
-            x_start + 1,
-            y_start - 1,
-            x_start + 1,
-            y_start + 1,
+            [x_start - 1, x_start - 1, x_start + 1, x_start + 1],
+            [y_start - 1, y_start + 1, y_start - 1, y_start + 1],
         ),
         0,
     );
 
     let mut visited = HashSet::new();
-    while let Some(((keys, x1, y1, x2, y2, x3, y3, x4, y4), d1)) = frontier.pop() {
+    let mut dist = vec![i16::max_value(); width * height];
+    while let Some(((keys, rx, ry), d1)) = frontier.pop() {
         if keys == (1 << num_keys) - 1 {
             println!("{}", -d1);
             break;
@@ -1134,141 +1133,47 @@ fn day18() -> Result<(), Box<dyn Error>> {
                 keys_str.push((i + 'a' as u8) as char);
             }
         }
-        visited.insert((keys, x1, y1, x2, y2, x3, y3, x4, y4));
+        visited.insert((keys, rx, ry));
 
-        let mut dist = vec![i16::max_value(); width * height];
-        let mut queue = VecDeque::new();
-        dist[y1 * width + x1] = 0;
-        queue.push_back((x1, y1, 0));
-        while let Some((x, y, d)) = queue.pop_front() {
-            let c = map[y * width + x];
-            if ('a'..='z').contains(&c) && keys & (1 << (c as u8 - b'a' as u8)) == 0 {
-                let nkeys = keys | (1 << (c as u8 - b'a' as u8));
-                let p = (nkeys, x, y, x2, y2, x3, y3, x4, y4);
-                if !visited.contains(&p) {
-                    let nd = d1 - d;
-                    frontier.push_increase(p, nd);
-                }
-            }
-            for k in 0..4 {
-                let (nx, ny) = (
-                    (x as isize + D[k].0) as usize,
-                    (y as isize + D[k].1) as usize,
-                );
-                let c = map[ny * width + nx];
-                if c == '#' {
-                    continue;
-                }
-                if ('A'..='Z').contains(&c) && keys & (1 << (c as u8 - b'A' as u8)) == 0 {
-                    continue;
-                }
-                if dist[ny * width + nx] <= d + 1 {
-                    continue;
-                }
-                dist[ny * width + nx] = d + 1;
-                queue.push_back((nx, ny, d + 1));
-            }
+        for d in &mut dist {
+            *d = i16::max_value();
         }
 
-        let mut dist = vec![i16::max_value(); width * height];
-        let mut queue = VecDeque::new();
-        dist[y2 * width + x2] = 0;
-        queue.push_back((x2, y2, 0));
-        while let Some((x, y, d)) = queue.pop_front() {
-            let c = map[y * width + x];
-            if ('a'..='z').contains(&c) && keys & (1 << (c as u8 - b'a' as u8)) == 0 {
-                let nkeys = keys | (1 << (c as u8 - b'a' as u8));
-                let p = (nkeys, x1, y1, x, y, x3, y3, x4, y4);
-                if !visited.contains(&p) {
-                    let nd = d1 - d;
-                    frontier.push_increase(p, nd);
+        for r in 0..4 {
+            let (cx, cy) = (rx[r], ry[r]);
+            dist[cy * width + cx] = 0;
+            queue.push_back((cx, cy, 0));
+            while let Some((x, y, d)) = queue.pop_front() {
+                let c = map[y * width + x];
+                if ('a'..='z').contains(&c) && keys & (1 << (c as u8 - b'a' as u8)) == 0 {
+                    let nkeys = keys | (1 << (c as u8 - b'a' as u8));
+                    let (mut nx, mut ny) = (rx, ry);
+                    nx[r] = x;
+                    ny[r] = y;
+                    let p = (nkeys, nx, ny);
+                    if !visited.contains(&p) {
+                        let nd = d1 - d;
+                        frontier.push_increase(p, nd);
+                    }
                 }
-            }
-            for k in 0..4 {
-                let (nx, ny) = (
-                    (x as isize + D[k].0) as usize,
-                    (y as isize + D[k].1) as usize,
-                );
-                let c = map[ny * width + nx];
-                if c == '#' {
-                    continue;
+                for k in 0..4 {
+                    let (nx, ny) = (
+                        (x as isize + D[k].0) as usize,
+                        (y as isize + D[k].1) as usize,
+                    );
+                    let c = map[ny * width + nx];
+                    if c == '#' {
+                        continue;
+                    }
+                    if ('A'..='Z').contains(&c) && keys & (1 << (c as u8 - b'A' as u8)) == 0 {
+                        continue;
+                    }
+                    if dist[ny * width + nx] <= d + 1 {
+                        continue;
+                    }
+                    dist[ny * width + nx] = d + 1;
+                    queue.push_back((nx, ny, d + 1));
                 }
-                if ('A'..='Z').contains(&c) && keys & (1 << (c as u8 - b'A' as u8)) == 0 {
-                    continue;
-                }
-                if dist[ny * width + nx] <= d + 1 {
-                    continue;
-                }
-                dist[ny * width + nx] = d + 1;
-                queue.push_back((nx, ny, d + 1));
-            }
-        }
-
-        let mut dist = vec![i16::max_value(); width * height];
-        let mut queue = VecDeque::new();
-        dist[y3 * width + x3] = 0;
-        queue.push_back((x3, y3, 0));
-        while let Some((x, y, d)) = queue.pop_front() {
-            let c = map[y * width + x];
-            if ('a'..='z').contains(&c) && keys & (1 << (c as u8 - b'a' as u8)) == 0 {
-                let nkeys = keys | (1 << (c as u8 - b'a' as u8));
-                let p = (nkeys, x1, y1, x2, y2, x, y, x4, y4);
-                if !visited.contains(&p) {
-                    let nd = d1 - d;
-                    frontier.push_increase(p, nd);
-                }
-            }
-            for k in 0..4 {
-                let (nx, ny) = (
-                    (x as isize + D[k].0) as usize,
-                    (y as isize + D[k].1) as usize,
-                );
-                let c = map[ny * width + nx];
-                if c == '#' {
-                    continue;
-                }
-                if ('A'..='Z').contains(&c) && keys & (1 << (c as u8 - b'A' as u8)) == 0 {
-                    continue;
-                }
-                if dist[ny * width + nx] <= d + 1 {
-                    continue;
-                }
-                dist[ny * width + nx] = d + 1;
-                queue.push_back((nx, ny, d + 1));
-            }
-        }
-
-        let mut dist = vec![i16::max_value(); width * height];
-        let mut queue = VecDeque::new();
-        dist[y4 * width + x4] = 0;
-        queue.push_back((x4, y4, 0));
-        while let Some((x, y, d)) = queue.pop_front() {
-            let c = map[y * width + x];
-            if ('a'..='z').contains(&c) && keys & (1 << (c as u8 - b'a' as u8)) == 0 {
-                let nkeys = keys | (1 << (c as u8 - b'a' as u8));
-                let p = (nkeys, x1, y1, x2, y2, x3, y3, x, y);
-                if !visited.contains(&p) {
-                    let nd = d1 - d;
-                    frontier.push_increase(p, nd);
-                }
-            }
-            for k in 0..4 {
-                let (nx, ny) = (
-                    (x as isize + D[k].0) as usize,
-                    (y as isize + D[k].1) as usize,
-                );
-                let c = map[ny * width + nx];
-                if c == '#' {
-                    continue;
-                }
-                if ('A'..='Z').contains(&c) && keys & (1 << (c as u8 - b'A' as u8)) == 0 {
-                    continue;
-                }
-                if dist[ny * width + nx] <= d + 1 {
-                    continue;
-                }
-                dist[ny * width + nx] = d + 1;
-                queue.push_back((nx, ny, d + 1));
             }
         }
     }
@@ -1933,5 +1838,5 @@ west
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    day22()
+    day18()
 }
